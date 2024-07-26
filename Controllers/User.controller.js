@@ -79,19 +79,27 @@ const login =(request, response)=>{
 }
 
  const getMessages = (request, response)=>{
-    console.log(request.params[0])
-    const username = request.params[0]
-    messagesModel.find({username: username}, (err, result)=>{
-        console.log("in")
-        if (result) {
-            console.log(result)
-            response.status(200).send(result)
-        }
-        else{
-            console.log(err.message)
-            response.status(500).send("An error occured")
-        }
-    })
+    console.log(request.body.token)
+   const user = jwt.decode(request.body.token)
+    if (user) {
+        const username = user.username
+        messagesModel.find({username: username}, (err, result)=>{
+            if (result) {
+                console.log(result)
+                response.status(200).send(result)
+            }
+            else{
+                console.log(err.message)
+                response.status(500).send("An error occured")
+            }
+        })
+    }
+    else{
+        console.log("error")
+        response.status(400).send("session expired, login again")
+    }
+
+
  }
 
  const sendMessage = (request, response)=>{
