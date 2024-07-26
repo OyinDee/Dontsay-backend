@@ -1,5 +1,5 @@
 require("dotenv").config()
-const {register,login}=require('./Controllers/User.controller')
+const {login, getMessages, sendMessage, create}=require('./Controllers/User.controller')
 const PORT = process.env.PORT
 const express= require('express') 
 const app = express();
@@ -10,9 +10,12 @@ const url=process.env.URI
 const bcryptjs= require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const cors = require('cors')
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({extended: true}))
 
+app.use(bodyParser.json({limit: '50mb'}));
+app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
+
+app.use(express.urlencoded({limit: '50mb'}))
+mongoose.Query.prototype.timeout = 20000
 mongoose.connect(url, (err)=>{
     if (err) {
         console.log(err.message);
@@ -22,8 +25,12 @@ mongoose.connect(url, (err)=>{
         console.log("MONGODB has connected");
     }
 })
-app.post("/user/signup", register);
+
+app.post("/user/create", create);
 app.post("/user/login", login);
+app.get("/get/*", getMessages)
+app.post("/send", sendMessage)
+
 
 app.listen(PORT,( )=>{
     console.log(`app listening on PORT ${PORT}`)

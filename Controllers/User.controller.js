@@ -1,113 +1,138 @@
 const { userInfoModel } = require("../Models/User.model");
+const {messagesModel} = require("../Models/Messages.model")
 const bcryptjs=require('bcryptjs')
+var cloudinary = require('cloudinary').v2;
 const jwt =require('jsonwebtoken')
 require('dotenv').config()
-const register = (request, response) => {
-    const userLog = request.body;
-    userInfoModel.findOne({email: userLog.email}, (err, result) => {
-        if(err) {
-            internalServerError(res);
-        } 
-        else if(result) {
-                response.send({status: false, message: "Email already exist"});
-            }
-        else{
-    userInfoModel.findOne({phoneNumber: userLog.phoneNumber}, (err, result) => {
-        if(err) {
-           response.send(err.message)
-           console.log(err.message)
-        } 
-        else if(result) {
-                response.send({status: false, message: "Phone number already exist"});
-            }
-        else{
-            const myPlaintextPassword = userLog.password
-            const salt = bcryptjs.genSaltSync(10);
-            const hash = bcryptjs.hashSync(myPlaintextPassword, salt);
-            const newForm={
-                email:userLog.email, 
-                username:userLog.username,          
-                password:hash,
-                phoneNumber:userLog.phoneNumber
-            }
-            console.log(newForm)
-            const form = new userInfoModel(newForm);
-            form.save((err) => {
-                response.send({status: true, message: "Registration successful"});
-            })
-        }
-    })
+cloudinary.config({ 
+    cloud_name:  process.env.CLOUD_NAME, 
+    api_key: process.env.API_KEY, 
+    api_secret: process.env.API_SECRET
+  });
 
-        }
-    })
-
- }
- const login = (req, res) => {
-    const userLog = req.body;
-    const emailorphone=userLog.emailorphone
-    console.log(userLog)
-        userInfoModel.findOne({email: emailorphone}, (err,result) => {
-        if (err) {
-            console.log(err.message)
-            response.send({status:false, message: err.message})
-        }
-        else if (!result) {
-        userInfoModel.findOne({phoneNumber: emailorphone}, (err,result) => {
+ const create = (request, response) => {
+    const username = request.body.username
+        userInfoModel.find({username: username}, (err,result) => {
             if (err) {
                 console.log(err.message)
-                response.send({status:false, message: err.message})
+                response.status(500).send({status:false, message: err.message})
             }
-            else if (!result) {
-                console.log("Phone number and email does not exist")
-                res.send({status: false, message: `Phone number and email does not exist`});
-            }
-            else {
+            else if(result.length != 0){
                 console.log(result)
-                const receivedPassword=result.password;
-                const myPlaintextPassword =userLog.password;
-                bcryptjs.hash(myPlaintextPassword,10).then((hash) => {
-                    return bcryptjs.compare(myPlaintextPassword, receivedPassword)
-                }).then((result) => {
-                    if(result==true){
-                        jwt.sign({emailorphone},  process.env.JWT_SECRET, (err, token)=> {
-                            if(err){
-                               console.log(err.message) 
-                            }
-                            else{
-                                console.log(token);
-                            }
-                            console.log("Successful login")
-                            res.send({message:"Your login is successful!",token})
-                        })
+                console.log("username not available")
+                response.status(400).send({message:"username not available",})
+            }
+            else{
+                jwt.sign({username},  process.env.JWT_SECRET, (err, token)=> {
+                    if(err){
+                       console.log(err.message) 
+                    }
+                    else{
+                        console.log(token);
+                    }
+                    console.log("new user added")
+                    const form = new userInfoModel(request.body);
+   
+                    form.save((err, result) => {
+                        if (err) {
+                            return response.status(400).send({status: false, message: err.message});
                         }
-                        else {
-                            res.send({status: false, message: `Invalid email or password`});
-                            console.log("Wrong password")
-                        }
-                        });
+                            response.status(200).send({message:"created successfully",token})
+                            console.log(result)
+                    })
+                })
             }
         })
+}
 
+const login =(request, response)=>{
+    const username = request.body.username
+    userInfoModel.findOne({username: username}, (err,result) => {
+        if (err) {
+            console.log(err.message)
+            response.status(500).send({status:false, message: err.message})
         }
-        else {
-            const receivedPassword=result.password;
-            const myPlaintextPassword =userLog.password;
-            bcryptjs.hash(myPlaintextPassword,10).then((hash) => {
-                return bcryptjs.compare(myPlaintextPassword, receivedPassword)
-            }).then((result) => {
-                if(result==true){
-                    jwt.sign({emailorphone},  process.env.JWT_SECRET, function(err, token) {
-                        console.log(token);
-                        console.log("Successful login")
-                        res.send({message:"Your login is successful!",token})
-                    })
-                    }
-                    else {
-                        res.send({status: false, message: `Invalid email or password`});
-                        console.log("Wrong password")
-                    }
-                    });
+        if (result) {
+             if(request.body.password==result.password){
+                   console.log(result)
+                   console.log("yes")
+                   jwt.sign({username},  process.env.JWT_SECRET, (err, token)=> {
+                       if(err){
+                          console.log(err.message) 
+                       }
+                       else{
+                           console.log(token);
+                       }
+                       response.status(200).send({message:"logged in", token})
+                   })
+                   }
+               else if(request.body.password!=result.password){
+                   console.log(result)
+                   console.log("no")
+                   response.status(400).send({message:"incorrect password"})
+               }
+        }
+        else{
+            response.status(404).send({message:"user not found"})
         }
     })
 }
- module.exports={register,login}
+
+ const getMessages = (request, response)=>{
+    console.log(request.params[0])
+    const username = request.params[0]
+    messagesModel.find({username: username}, (err, result)=>{
+        console.log("in")
+        if (result) {
+            console.log(result)
+            response.status(200).send(result)
+        }
+        else{
+            console.log(err.message)
+            response.status(500).send("An error occured")
+        }
+    })
+ }
+
+ const sendMessage = (request, response)=>{
+
+     if (request.body.img) {
+
+        cloudinary.uploader
+        .upload(`${request.body.img}`)
+        .then(result=>{
+            const everything ={
+                message: request.body.message,
+                username: request.body.username,
+                imageURL: result.secure_url,
+            }
+            const form = new messagesModel(everything);
+             form.save((err, result) => {
+                if (err) {
+                    console.log(err.message)
+                    return response.status(400).send({status: false, message: err.message});
+                }
+                    response.status(200).send({status: true, message: "Sent"});
+                    console.log(result)
+            })
+        })
+        .catch((err)=>{
+            console.log(err.message)
+        });
+
+     }
+  else{
+      const form = new messagesModel(request.body);
+   
+       form.save((err, result) => {
+           if (err) {
+               return response.status(400).send({status: false, message: err.message});
+           }
+               response.status(200).send({status: true, message: "Sent"});
+               console.log(result)
+       })
+
+  }
+ }
+
+ module.exports={ getMessages, sendMessage, create, login}
