@@ -88,7 +88,7 @@ const login =(request, response)=>{
             if (result) {
                 if(result.length==0){
                 console.log("nothing")
-                response.status(200).send({message: "nothing", stat: true})   
+                response.status(200).send({message: "nothing", stat: true, username:username})   
                 }
                 else{
                 console.log(result)
