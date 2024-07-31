@@ -122,27 +122,30 @@ const login =(request, response)=>{
                 imageURL: result.secure_url,
             }
             const form = new messagesModel(everything);
-             form.save((err, result) => {
+
+            userInfoModel.findOne({username: request.body.username}, (err,result) => {
                 if (err) {
                     console.log(err.message)
-                    return response.status(400).send({status: false, message: err.message});
+                    response.status(500).send({stat:false, message: err.message})
                 }
-                 else{
-                         userInfoModel.findOne({username: request.body.username}, (err,result) => {
-        if (err) {
-            console.log(err.message)
-            response.status(500).send({stat:false, message: err.message})
-        }
-        if (result) {
-                    response.status(200).send({stat: true, message: "Sent"});
-                    console.log(result)
-        }
-        else{
-            response.status(200).send({message:"user not found", stat:false})
-        }
-    })
-                 }
+                if (result) {
+                    form.save((err, result) => {
+                        if (err) {
+                            console.log(err.message)
+                            return response.status(400).send({status: false, message: err.message});
+                        }
+                         else{
+                             response.status(200).send({stat: true, message: "Sent"});
+                             console.log(result)                      
+                         }
+                    })
+                }
+                else{
+                    response.status(200).send({message:"user not found", stat:false})
+                }
             })
+
+             
         })
         .catch((err)=>{
             console.log(err.message)
@@ -151,16 +154,34 @@ const login =(request, response)=>{
      }
   else{
       const form = new messagesModel(request.body);
-   
-       form.save((err, result) => {
-           if (err) {
-               return response.status(400).send({status: false, message: err.message});
-           }
-               response.status(200).send({status: true, message: "Sent"});
-               console.log(result)
-       })
-
-  }
+      userInfoModel.findOne({username: request.body.username}, (err,result) => {
+        if (err) {
+            console.log(err.message)
+            response.status(500).send({stat:false, message: err.message})
+        }
+        if (result) {
+            form.save((err, result) => {
+                if (err) {
+                    console.log(err.message)
+                    response.status(500).send({stat:false, message: err.message})
+                }
+                if (result) {
+                    form.save((err, result) => {
+                        if (err) {
+                            console.log(err.message)
+                            return response.status(400).send({status: false, message: err.message});
+                        }
+                         else{
+                             response.status(200).send({stat: true, message: "Sent"});
+                             console.log(result)                      
+                         }
+                        }
+                    )}
+            })
+        }
+    })
+        
  }
+}
 
- module.exports={ getMessages, sendMessage, create, login}
+ module.exports={ getMessages, sendMessage, create, login }
