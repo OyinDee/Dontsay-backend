@@ -127,8 +127,21 @@ const login =(request, response)=>{
                     console.log(err.message)
                     return response.status(400).send({status: false, message: err.message});
                 }
-                    response.status(200).send({status: true, message: "Sent"});
+                 else{
+                         userInfoModel.findOne({username: username}, (err,result) => {
+        if (err) {
+            console.log(err.message)
+            response.status(500).send({stat:false, message: err.message})
+        }
+        if (result) {
+                    response.status(200).send({stat: true, message: "Sent"});
                     console.log(result)
+        }
+        else{
+            response.status(200).send({message:"user not found", stat:false})
+        }
+    })
+                 }
             })
         })
         .catch((err)=>{
