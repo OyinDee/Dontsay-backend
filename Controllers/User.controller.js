@@ -154,15 +154,15 @@ const login =(request, response)=>{
 
      }
   else{
-      console.log("got it")
-      const form = new messagesModel(request.body);
       userInfoModel.findOne({username: request.body.username}, (err,result) => {
+      console.log("got it")
         if (err) {
             console.log(err.message)
             response.status(500).send({stat:false, message: err.message})
         }
         if (result) {
             console.log("searching...")
+      const form = new messagesModel(request.body);
             form.save((err, result) => {
                 if (err) {
                     console.log(err.message)
