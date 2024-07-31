@@ -83,10 +83,17 @@ const login =(request, response)=>{
    const user = jwt.decode(request.body.token)
     if (user) {
         const username = user.username
+        console.log(username)
         messagesModel.find({username: username}, (err, result)=>{
             if (result) {
+                if(result.length==0){
+                console.log("nothing)
+                response.status(200).send({message: "nothing", stat: true})   
+                }
+                else{
                 console.log(result)
-                response.status(200).send(result)
+                response.status(200).send({message: result, stat: true})                
+                }
             }
             else{
                 console.log(err.message)
