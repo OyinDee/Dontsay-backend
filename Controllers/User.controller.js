@@ -87,7 +87,7 @@ const login =(request, response)=>{
         messagesModel.find({username: username}, (err, result)=>{
             if (result) {
                 if(result.length==0){
-                console.log("nothing)
+                console.log("nothing")
                 response.status(200).send({message: "nothing", stat: true})   
                 }
                 else{
