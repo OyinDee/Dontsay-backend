@@ -28,7 +28,7 @@ mongoose.connect(url, (err)=>{
 
 app.post("/user/create", create);
 app.post("/user/login", login);
-app.post("/get/*", getMessages)
+app.post("/get", getMessages)
 app.post("/send", sendMessage)
 
 
