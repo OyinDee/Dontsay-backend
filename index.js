@@ -13,7 +13,7 @@ const cors = require('cors')
 
 app.use(bodyParser.json({limit: '50mb'}));
 app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
-
+app.use(cors())
 app.use(express.urlencoded({limit: '50mb'}))
 mongoose.Query.prototype.timeout = 20000
 mongoose.connect(url, (err)=>{
