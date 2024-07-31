@@ -149,10 +149,12 @@ const login =(request, response)=>{
         })
         .catch((err)=>{
             console.log(err.message)
+                    response.status(400).send({message:"error", stat:false})
         });
 
      }
   else{
+      console.log("got it")
       const form = new messagesModel(request.body);
       userInfoModel.findOne({username: request.body.username}, (err,result) => {
         if (err) {
