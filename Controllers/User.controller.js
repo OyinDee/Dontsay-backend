@@ -92,7 +92,7 @@ const login =(request, response)=>{
                 }
                 else{
                 console.log(result)
-                response.status(200).send({message: result, stat: true})                
+                response.status(200).send({message: result, username:username, stat: true})                
                 }
             }
             else{
