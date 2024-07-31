@@ -20,7 +20,7 @@ cloudinary.config({
             else if(result.length != 0){
                 console.log(result)
                 console.log("username not available")
-                response.status(400).send({message:"username not available",})
+                response.status(200).send({message:"username not available",})
             }
             else{
                 jwt.sign({username},  process.env.JWT_SECRET, (err, token)=> {
