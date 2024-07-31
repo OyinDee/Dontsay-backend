@@ -20,7 +20,7 @@ cloudinary.config({
             else if(result.length != 0){
                 console.log(result)
                 console.log("username not available")
-                response.status(200).send({message:"username not available",})
+                response.status(200).send({message:"username not available", stat:false})
             }
             else{
                 jwt.sign({username},  process.env.JWT_SECRET, (err, token)=> {
@@ -35,9 +35,9 @@ cloudinary.config({
    
                     form.save((err, result) => {
                         if (err) {
-                            return response.status(400).send({status: false, message: err.message});
+                            return response.status(200).send({stat: false, message: err.message});
                         }
-                            response.status(200).send({message:"created successfully",token})
+                            response.status(200).send({message:"created successfully",token, stat:true})
                             console.log(result)
                     })
                 })
@@ -50,7 +50,7 @@ const login =(request, response)=>{
     userInfoModel.findOne({username: username}, (err,result) => {
         if (err) {
             console.log(err.message)
-            response.status(500).send({status:false, message: err.message})
+            response.status(500).send({stat:false, message: err.message})
         }
         if (result) {
              if(request.body.password==result.password){
@@ -63,17 +63,17 @@ const login =(request, response)=>{
                        else{
                            console.log(token);
                        }
-                       response.status(200).send({message:"logged in", token})
+                       response.status(200).send({message:"logged in", token, stat:true})
                    })
                    }
                else if(request.body.password!=result.password){
                    console.log(result)
                    console.log("no")
-                   response.status(400).send({message:"incorrect password"})
+                   response.status(200).send({message:"incorrect password", stat:false})
                }
         }
         else{
-            response.status(404).send({message:"user not found"})
+            response.status(200).send({message:"user not found", stat:false})
         }
     })
 }
