@@ -128,7 +128,7 @@ const login =(request, response)=>{
                     return response.status(400).send({status: false, message: err.message});
                 }
                  else{
-                         userInfoModel.findOne({username: username}, (err,result) => {
+                         userInfoModel.findOne({username: request.body.username}, (err,result) => {
         if (err) {
             console.log(err.message)
             response.status(500).send({stat:false, message: err.message})
