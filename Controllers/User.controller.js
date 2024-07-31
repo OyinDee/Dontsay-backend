@@ -160,6 +160,7 @@ const login =(request, response)=>{
             response.status(500).send({stat:false, message: err.message})
         }
         if (result) {
+            console.log("searching...")
             form.save((err, result) => {
                 if (err) {
                     console.log(err.message)
