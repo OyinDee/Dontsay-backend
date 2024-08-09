@@ -31,7 +31,7 @@ app.get("/",(req,res)=>{
     res.send("hello everyone")
 })
 
-app.listen(5000,( )=>{
-    // console.log(`app listening on PORT ${PORT}`)
-    console.log('yeeeeeeeeeeeeeeeeee')
+app.listen(PORT,( )=>{
+    console.log(`app listening on PORT ${PORT}`)
+    // console.log('yeeeeeeeeeeeeeeeeee')
 })
