@@ -87,7 +87,7 @@ const getMessages = async (request, response) => {
 };
 
 const sendMessage = async (request, response) => {
-  const { img, message, username } = request.body;
+  const { img, message, username, time } = request.body;
 
   try {
     let imageURL = null;
@@ -105,6 +105,7 @@ const sendMessage = async (request, response) => {
       message,
       username,
       imageURL,
+      time
     });
 
     const result = await newMessage.save();
