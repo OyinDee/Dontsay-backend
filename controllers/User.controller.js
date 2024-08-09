@@ -12,17 +12,13 @@ cloudinary.config({
 
 const create = (request, response) => {
     const username = request.body.username
-    userInfoModel.find({ username: username }, (err, result) => {
-        if (err) {
-            console.log(err.message)
-            response.status(500).send({ status: false, message: err.message })
-        }
-        else if (result.length != 0) {
+    userInfoModel.find({ username: username })
+    .then((result)=>{
+        if (result.length != 0) {
             console.log(result)
             console.log("username not available")
             response.status(200).send({ message: "username not available", stat: false })
-        }
-        else {
+        } else {
             jwt.sign({ username }, process.env.JWT_SECRET, (err, token) => {
                 if (err) {
                     console.log(err.message)
@@ -41,6 +37,12 @@ const create = (request, response) => {
                     console.log(result)
                 })
             })
+        }
+    })
+    .catch((err)=>{
+        if (err) {
+            console.log(err.message)
+            response.status(500).send({ status: false, message: err.message })
         }
     })
 }
