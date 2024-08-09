@@ -1,14 +1,14 @@
 require("dotenv").config()
-const {login, getMessages, sendMessage, create}=require('Controllers/User.controller')
+const {login, getMessages, sendMessage, create}=require('./controllers/User.controller')
 const PORT = process.env.PORT || 5000
 const express= require('express') 
 const app = express();
 const bodyParser=require('body-parser')
 const mongoose = require('mongoose')
-const { MongoClient, ServerApiVersion } = require('mongodb')
+// const { MongoClient, ServerApiVersion } = require('mongodb')
 const url=process.env.URI
-const bcryptjs= require('bcryptjs')
-const jwt = require('jsonwebtoken')
+// const bcryptjs= require('bcryptjs')
+// const jwt = require('jsonwebtoken')
 const cors = require('cors')
 
 app.use(bodyParser.json({limit: '50mb'}));
