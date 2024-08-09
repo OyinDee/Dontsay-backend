@@ -3,7 +3,7 @@ const {login, getMessages, sendMessage, create}=require('./Controllers/User.cont
 const PORT = process.env.PORT || 5000
 const express= require('express') 
 const app = express();
-// const bodyParser=require('body-parser')
+const bodyParser=require('body-parser')
 const mongoose = require('mongoose')
 const { MongoClient, ServerApiVersion } = require('mongodb')
 const url=process.env.URI
@@ -11,8 +11,8 @@ const bcryptjs= require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const cors = require('cors')
 
-// app.use(bodyParser.json({limit: '50mb'}));
-// app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
+app.use(bodyParser.json({limit: '50mb'}));
+app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 app.use(cors())
 app.use(express.urlencoded({limit: '50mb'}))
 mongoose.Query.prototype.timeout = 20000
