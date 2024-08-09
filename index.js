@@ -17,13 +17,13 @@ app.use(cors())
 app.use(express.urlencoded({limit: '50mb', extended: true}))
 mongoose.Query.prototype.timeout = 20000
 mongoose.connect(url)
-    .then()=>{
+    .then(()=>{
         console.log("MONGODB has connected");  
-    }
-    .catch(err)=>{
+    })
+    .catch((err)=>{
         console.log(err.message);
         console.log("Error in mongodb connection");
-    }
+    })
 
 
 app.post("/user/create", create);
