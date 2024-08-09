@@ -13,38 +13,39 @@ cloudinary.config({
 const create = (request, response) => {
     const username = request.body.username
     userInfoModel.find({ username: username })
-    .then((result)=>{
-        if (result.length != 0) {
-            console.log(result)
-            console.log("username not available")
-            response.status(200).send({ message: "username not available", stat: false })
-        } else {
-            jwt.sign({ username }, process.env.JWT_SECRET, (err, token) => {
-                if (err) {
-                    console.log(err.message)
-                }
-                else {
-                    console.log(token);
-                }
-                console.log("new user added")
-                const form = new userInfoModel(request.body);
-
-                form.save((err, result) => {
+        .then((result) => {
+            if (result.length != 0) {
+                console.log(result)
+                console.log("username not available")
+                response.status(200).send({ message: "username not available", stat: false })
+            } else {
+                jwt.sign({ username }, process.env.JWT_SECRET, (err, token) => {
                     if (err) {
-                        return response.status(200).send({ stat: false, message: err.message });
+                        console.log(err.message)
                     }
-                    response.status(200).send({ message: "created successfully", token, stat: true })
-                    console.log(result)
+                    else {
+                        console.log(token);
+                    }
+                    console.log("new user added")
+                    const form = new userInfoModel(request.body);
+
+                    form.save()
+                        .then((result) => {
+                            response.status(200).send({ message: "created successfully", token, stat: true })
+                            console.log(result)
+                        })
+                        .catch((err) => {
+                            return response.status(200).send({ stat: false, message: err.message });
+                        })
                 })
-            })
-        }
-    })
-    .catch((err)=>{
-        if (err) {
-            console.log(err.message)
-            response.status(500).send({ status: false, message: err.message })
-        }
-    })
+            }
+        })
+        .catch((err) => {
+            if (err) {
+                console.log(err.message)
+                response.status(500).send({ status: false, message: err.message })
+            }
+        })
 }
 
 const login = (request, response) => {
