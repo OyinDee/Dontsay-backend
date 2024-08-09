@@ -1,6 +1,6 @@
 require("dotenv").config()
 const {login, getMessages, sendMessage, create}=require('./Controllers/User.controller')
-const PORT = process.env.PORT
+const PORT = process.env.PORT || 5000
 const express= require('express') 
 const app = express();
 const bodyParser=require('body-parser')
@@ -30,7 +30,9 @@ app.post("/user/create", create);
 app.post("/user/login", login);
 app.post("/get", getMessages)
 app.post("/send", sendMessage)
-
+app.get("/",(req,res)=>{
+    res.send("hello")
+})
 
 app.listen(PORT,( )=>{
     console.log(`app listening on PORT ${PORT}`)
