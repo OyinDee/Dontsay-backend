@@ -11,7 +11,7 @@ cloudinary.config({
   api_secret: process.env.API_SECRET,
 });
 
-// Ensure that username is indexed in your MongoDB collections for faster queries.
+
 
 const create = async (request, response) => {
   const username = request.body.username;
