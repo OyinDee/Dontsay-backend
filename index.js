@@ -16,7 +16,7 @@ app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 app.use(cors())
 app.use(express.urlencoded({limit: '50mb', extended: true}))
 mongoose.Query.prototype.timeout = 20000
-mongoose.connect("mongodb+srv://ajalaoyinda:diidee@cluster0.czikygb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+mongoose.connect("mongodb+srv://ajalaoyinda:2ZuYWIC2aZKtP0Ur@cluster0.czikygb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
     .then(()=>{
         console.log("MONGODB has connected");  
     })
