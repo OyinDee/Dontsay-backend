@@ -50,11 +50,8 @@ const create = (request, response) => {
 
 const login = (request, response) => {
     const username = request.body.username
-    userInfoModel.findOne({ username: username }, (err, result) => {
-        if (err) {
-            console.log(err.message)
-            response.status(500).send({ stat: false, message: err.message })
-        }
+    userInfoModel.findOne({ username: username })
+    .then(()=>{
         if (result) {
             if (request.body.password == result.password) {
                 console.log(result)
@@ -77,6 +74,13 @@ const login = (request, response) => {
         }
         else {
             response.status(200).send({ message: "user not found", stat: false })
+        }
+
+    })
+    .catch((err)=>{
+        if (err) {
+            console.log(err.message)
+            response.status(500).send({ stat: false, message: err.message })
         }
     })
 }
