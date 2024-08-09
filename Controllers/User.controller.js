@@ -22,8 +22,11 @@ const create = (request, response) => {
         console.log("username not available");
         response.status(200).send({ message: "username not available", stat: false });
       } else {
-        jwt.sign({ username }, process.env.JWT_SECRET)
-          .then((token) => {
+        jwt.sign({ username }, process.env.JWT_SECRET, (err, token) => {
+          if (err) {
+            console.log(err.message);
+            response.status(500).send({ stat: false, message: err.message });
+          } else {
             console.log(token);
             console.log("new user added");
 
@@ -36,11 +39,8 @@ const create = (request, response) => {
               .catch((err) => {
                 response.status(200).send({ stat: false, message: err.message });
               });
-          })
-          .catch((err) => {
-            console.log(err.message);
-            response.status(500).send({ stat: false, message: err.message });
-          });
+          }
+        });
       }
     })
     .catch((err) => {
@@ -60,15 +60,15 @@ const login = (request, response) => {
           console.log(result);
           console.log("yes");
 
-          jwt.sign({ username }, process.env.JWT_SECRET)
-            .then((token) => {
-              console.log(token);
-              response.status(200).send({ message: "logged in", token, stat: true });
-            })
-            .catch((err) => {
+          jwt.sign({ username }, process.env.JWT_SECRET, (err, token) => {
+            if (err) {
               console.log(err.message);
               response.status(500).send({ stat: false, message: err.message });
-            });
+            } else {
+              console.log(token);
+              response.status(200).send({ message: "logged in", token, stat: true });
+            }
+          });
         } else {
           console.log(result);
           console.log("no");
