@@ -51,7 +51,7 @@ const create = (request, response) => {
 const login = (request, response) => {
     const username = request.body.username
     userInfoModel.findOne({ username: username })
-    .then(()=>{
+    .then((result)=>{
         if (result) {
             if (request.body.password == result.password) {
                 console.log(result)
@@ -91,7 +91,8 @@ const getMessages = (request, response) => {
     if (user) {
         const username = user.username
         console.log(username)
-        messagesModel.find({ username: username }, (err, result) => {
+        messagesModel.find({ username: username })
+        .then((result)=>{
             if (result) {
                 if (result.length == 0) {
                     console.log("nothing")
@@ -102,10 +103,10 @@ const getMessages = (request, response) => {
                     response.status(200).send({ message: result, username: username, stat: true })
                 }
             }
-            else {
-                console.log(err.message)
+        })
+        .catch((err)=>{
+            console.log(err.message)
                 response.status(500).send("An error occured")
-            }
         })
     }
     else {
