@@ -1,7 +1,7 @@
 const { userInfoModel } = require("../Models/User.model");
 const { messagesModel } = require("../Models/Messages.model");
 const bcryptjs = require("bcryptjs");
-var cloudinary = require("cloudinary").v2;
+const cloudinary = require("cloudinary").v2;
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
@@ -11,174 +11,109 @@ cloudinary.config({
   api_secret: process.env.API_SECRET,
 });
 
-const create = (request, response) => {
+// Ensure that username is indexed in your MongoDB collections for faster queries.
+
+const create = async (request, response) => {
   const username = request.body.username;
 
-  userInfoModel
-    .find({ username: username })
-    .then((result) => {
-      if (result.length !== 0) {
-        console.log(result);
-        console.log("username not available");
-        response.status(200).send({ message: "username not available", stat: false });
-      } else {
-        jwt.sign({ username }, process.env.JWT_SECRET, (err, token) => {
-          if (err) {
-            console.log(err.message);
-            response.status(500).send({ stat: false, message: err.message });
-          } else {
-            console.log(token);
-            console.log("new user added");
+  try {
+    const existingUser = await userInfoModel.findOne({ username });
+    if (existingUser) {
+      console.log("username not available");
+      return response.status(200).send({ message: "username not available", stat: false });
+    }
 
-            const form = new userInfoModel(request.body);
-            form.save()
-              .then((result) => {
-                response.status(200).send({ message: "created successfully", token, stat: true });
-                console.log(result);
-              })
-              .catch((err) => {
-                response.status(200).send({ stat: false, message: err.message });
-              });
-          }
-        });
-      }
-    })
-    .catch((err) => {
-      console.log(err.message);
-      response.status(500).send({ stat: false, message: err.message });
-    });
-};
+    const token = jwt.sign({ username }, process.env.JWT_SECRET);
+    console.log("new user added", token);
 
-const login = (request, response) => {
-  const username = request.body.username;
+    const form = new userInfoModel(request.body);
+    const result = await form.save();
 
-  userInfoModel
-    .findOne({ username: username })
-    .then((result) => {
-      if (result) {
-        if (request.body.password === result.password) {
-          console.log(result);
-          console.log("yes");
-
-          jwt.sign({ username }, process.env.JWT_SECRET, (err, token) => {
-            if (err) {
-              console.log(err.message);
-              response.status(500).send({ stat: false, message: err.message });
-            } else {
-              console.log(token);
-              response.status(200).send({ message: "logged in", token, stat: true });
-            }
-          });
-        } else {
-          console.log(result);
-          console.log("no");
-          response.status(200).send({ message: "incorrect password", stat: false });
-        }
-      } else {
-        response.status(200).send({ message: "user not found", stat: false });
-      }
-    })
-    .catch((err) => {
-      console.log(err.message);
-      response.status(500).send({ stat: false, message: err.message });
-    });
-};
-
-const getMessages = (request, response) => {
-  console.log(request.body.token);
-  const user = jwt.decode(request.body.token);
-
-  if (user) {
-    const username = user.username;
-    console.log(username);
-
-    messagesModel
-      .find({ username: username })
-      .then((result) => {
-        if (result.length === 0) {
-          console.log("nothing");
-          response.status(200).send({ message: "nothing", stat: true, username: username });
-        } else {
-          console.log(result);
-          response.status(200).send({ message: result, username: username, stat: true });
-        }
-      })
-      .catch((err) => {
-        console.log(err.message);
-        response.status(500).send("An error occurred");
-      });
-  } else {
-    console.log("error");
-    response.status(400).send("session expired, login again");
+    console.log(result);
+    response.status(200).send({ message: "created successfully", token, stat: true });
+  } catch (err) {
+    console.log(err.message);
+    response.status(500).send({ stat: false, message: err.message });
   }
 };
 
-const sendMessage = (request, response) => {
-  if (request.body.img) {
-    cloudinary.uploader
-      .upload(`${request.body.img}`)
-      .then((result) => {
-        const everything = {
-          message: request.body.message,
-          username: request.body.username,
-          imageURL: result.secure_url,
-        };
+const login = async (request, response) => {
+  const { username, password } = request.body;
 
-        const form = new messagesModel(everything);
+  try {
+    const user = await userInfoModel.findOne({ username });
+    if (!user) {
+      return response.status(200).send({ message: "user not found", stat: false });
+    }
 
-        userInfoModel
-          .findOne({ username: request.body.username })
-          .then((result) => {
-            if (result) {
-              form.save()
-                .then((result) => {
-                  response.status(200).send({ stat: true, message: "Sent" });
-                  console.log(result);
-                })
-                .catch((err) => {
-                  console.log(err.message);
-                  response.status(400).send({ status: false, message: err.message });
-                });
-            } else {
-              response.status(200).send({ message: "user not found", stat: false });
-            }
-          })
-          .catch((err) => {
-            console.log(err.message);
-            response.status(500).send({ stat: false, message: err.message });
-          });
-      })
-      .catch((err) => {
-        console.log(err.message);
-        response.status(400).send({ message: "error", stat: false });
-      });
-  } else {
-    userInfoModel
-      .findOne({ username: request.body.username })
-      .then((result) => {
-        console.log("got it");
+    const passwordMatch = password === user.password;
+    if (!passwordMatch) {
+      return response.status(200).send({ message: "incorrect password", stat: false });
+    }
 
-        if (result) {
-          console.log("searching...");
+    const token = jwt.sign({ username }, process.env.JWT_SECRET);
+    console.log("logged in", token);
 
-          const form = new messagesModel(request.body);
-          form.save()
-            .then((result) => {
-              response.status(200).send({ stat: true, message: "Sent" });
-              console.log(result);
-            })
-            .catch((err) => {
-              console.log(err.message);
-              response.status(400).send({ status: false, message: err.message });
-            });
-        } else {
-          response.status(200).send({ stat: false, message: "user not found" });
-        }
-      })
-      .catch((err) => {
-        console.log(err.message);
-        response.status(500).send({ stat: false, message: err.message });
-      });
+    response.status(200).send({ message: "logged in", token, stat: true });
+  } catch (err) {
+    console.log(err.message);
+    response.status(500).send({ stat: false, message: err.message });
+  }
+};
+
+const getMessages = async (request, response) => {
+  const token = request.body.token;
+  const user = jwt.decode(token);
+
+  if (!user) {
+    return response.status(400).send("session expired, login again");
+  }
+
+  const username = user.username;
+  console.log(username);
+
+  try {
+    const messages = await messagesModel.find({ username });
+    if (messages.length === 0) {
+      return response.status(200).send({ message: "nothing", stat: true, username });
+    }
+
+    console.log(messages);
+    response.status(200).send({ message: messages, username, stat: true });
+  } catch (err) {
+    console.log(err.message);
+    response.status(500).send("An error occurred");
+  }
+};
+
+const sendMessage = async (request, response) => {
+  const { img, message, username } = request.body;
+
+  try {
+    let imageURL = null;
+    if (img) {
+      const uploadResult = await cloudinary.uploader.upload(img);
+      imageURL = uploadResult.secure_url;
+    }
+
+    const userExists = await userInfoModel.findOne({ username });
+    if (!userExists) {
+      return response.status(200).send({ message: "user not found", stat: false });
+    }
+
+    const newMessage = new messagesModel({
+      message,
+      username,
+      imageURL,
+    });
+
+    const result = await newMessage.save();
+    console.log(result);
+
+    response.status(200).send({ stat: true, message: "Sent" });
+  } catch (err) {
+    console.log(err.message);
+    response.status(400).send({ status: false, message: err.message });
   }
 };
 
