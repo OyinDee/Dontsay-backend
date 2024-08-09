@@ -16,14 +16,14 @@ app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 app.use(cors())
 app.use(express.urlencoded({limit: '50mb', extended: true}))
 mongoose.Query.prototype.timeout = 20000
-mongoose.connect(url, (err)=>{
-if(err){
+mongoose.connect(url)
+    .then(()=>{
+        console.log("MONGODB has connected");  
+    })
+    .catch((err)=>{
+        console.log(err.message);
         console.log("Error in mongodb connection");
-}
-    else{
-        console.log("MONGODB has connected");        
-    }
-})
+    })
 
 
 
