@@ -3,6 +3,12 @@ const { messagesModel } = require("../Models/Messages.model");
 const bcryptjs = require("bcryptjs");
 const cloudinary = require("cloudinary").v2;
 const jwt = require("jsonwebtoken");
+const MailerService = require("../Services/Mailer.Services");
+const { generateForgotPasswordCode } = require("../Utils/CodeGenerator.utils");
+const {
+  forgotPasswordCodesModel,
+} = require("../Models/ForgotPasswordCodes.model");
+const argon2 = require("argon2");
 require("dotenv").config();
 
 cloudinary.config({
@@ -11,26 +17,38 @@ cloudinary.config({
   api_secret: process.env.API_SECRET,
 });
 
-
+const mailerService = new MailerService();
 
 const create = async (request, response) => {
   const username = request.body.username;
+  const password = request.body.password;
 
   try {
     const existingUser = await userInfoModel.findOne({ username });
     if (existingUser) {
       console.log("username not available");
-      return response.status(200).send({ message: "username not available", stat: false });
+      return response
+        .status(200)
+        .send({ message: "username not available", stat: false });
     }
 
     const token = jwt.sign({ username }, process.env.JWT_SECRET);
     console.log("new user added", token);
 
-    const form = new userInfoModel(request.body);
+    const hashedPassword = await argon2.hash(password);
+
+    const userPayload = {
+      username,
+      password: hashedPassword,
+    };
+
+    const form = new userInfoModel(userPayload);
     const result = await form.save();
 
     console.log(result);
-    response.status(200).send({ message: "created successfully", token, stat: true });
+    response
+      .status(200)
+      .send({ message: "created successfully", token, stat: true });
   } catch (err) {
     console.log(err.message);
     response.status(500).send({ stat: false, message: err.message });
@@ -43,12 +61,16 @@ const login = async (request, response) => {
   try {
     const user = await userInfoModel.findOne({ username });
     if (!user) {
-      return response.status(200).send({ message: "user not found", stat: false });
+      return response
+        .status(200)
+        .send({ message: "user not found", stat: false });
     }
 
-    const passwordMatch = password === user.password;
+    const passwordMatch = await argon2.verify(user.password, password);
     if (!passwordMatch) {
-      return response.status(200).send({ message: "incorrect password", stat: false });
+      return response
+        .status(200)
+        .send({ message: "incorrect password", stat: false });
     }
 
     const token = jwt.sign({ username }, process.env.JWT_SECRET);
@@ -75,7 +97,9 @@ const getMessages = async (request, response) => {
   try {
     const messages = await messagesModel.find({ username });
     if (messages.length === 0) {
-      return response.status(200).send({ message: "nothing", stat: true, username });
+      return response
+        .status(200)
+        .send({ message: "nothing", stat: true, username });
     }
 
     console.log(messages);
@@ -98,14 +122,16 @@ const sendMessage = async (request, response) => {
 
     const userExists = await userInfoModel.findOne({ username });
     if (!userExists) {
-      return response.status(200).send({ message: "user not found", stat: false });
+      return response
+        .status(200)
+        .send({ message: "user not found", stat: false });
     }
 
     const newMessage = new messagesModel({
       message,
       username,
       imageURL,
-      time
+      time,
     });
 
     const result = await newMessage.save();
@@ -118,4 +144,83 @@ const sendMessage = async (request, response) => {
   }
 };
 
-module.exports = { getMessages, sendMessage, create, login };
+const sendForgotPasswordMail = async (req, res) => {
+  try {
+    const { email, username } = req.body;
+    const existingUser = await userInfoModel.findOne({ username });
+    if (!existingUser)
+      return res.status(404).send({ message: "User not found" });
+    const code = generateForgotPasswordCode();
+
+    const existingCode = await forgotPasswordCodesModel.findOne({
+      email,
+      username,
+    });
+    if (existingCode) return res.status(400).send({ message: "Code already sent" });
+
+    const newUserCode = {
+      email,
+      username,
+      code,
+    };
+
+    const createUserCode = await forgotPasswordCodesModel.create(newUserCode);
+    if (!createUserCode)
+      return res
+        .status(500)
+        .send({ message: "An error occurred. Try again later" });
+
+    const sendMail = await mailerService.sendForgotPasswordMail(
+      email,
+      code,
+      username
+    );
+    if (!sendMail)
+      return res
+        .status(500)
+        .send({ message: "An error occurred. Try again later" });
+
+    return res.status(200).send({ ...sendMail });
+  } catch (error) {
+    console.log(error);
+    res
+      .status(500)
+      .send({ message: "Internal server error", stat: false });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { code, newPassword, username } = req.body;
+
+    const existingUser = await userInfoModel.findOne({ username });
+    if (!existingUser) return res.status(404).send({ message: "User not found" });
+
+    const verifyCode = await forgotPasswordCodesModel.findOne({
+      code,
+      username,
+    });
+    if (!verifyCode) return res.status(400).send({ message: "Invalid code" });
+
+    const hashedPassword = await argon2.hash(newPassword);
+    const updatePassword = await userInfoModel.updateOne(
+      { username },
+      { password: hashedPassword }
+    );
+    return res.status(200).send({ message: "Password updated successfully", stat:true });
+  } catch (error) {
+    console.log(err.message);
+    response.status(500).send({ message: "Internal server error", stat:false });
+  }
+};
+
+//
+
+module.exports = {
+  getMessages,
+  sendMessage,
+  create,
+  login,
+  sendForgotPasswordMail,
+  resetPassword
+};
