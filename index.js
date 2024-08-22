@@ -1,5 +1,5 @@
 require("dotenv").config()
-const {login, getMessages, sendMessage, create}=require('./Controllers/User.controller')
+const {login, getMessages, sendMessage, create, sendForgotPasswordMail, resetPassword}=require('./Controllers/User.controller')
 const PORT = process.env.PORT
 const express= require('express') 
 const app = express();
@@ -21,7 +21,7 @@ mongoose.connect(url)
         console.log("MONGODB has connected");  
     })
     .catch((err)=>{
-        console.log(err.message);
+        console.log(err);
         console.log("Error in mongodb connection");
     })
 
@@ -31,6 +31,8 @@ app.post("/user/create", create);
 app.post("/user/login", login);
 app.post("/get", getMessages)
 app.post("/send", sendMessage)
+app.post("/user/forgot-password", sendForgotPasswordMail)
+app.post("/user/reset-password", resetPassword)
 
 
 app.listen(PORT,( )=>{
