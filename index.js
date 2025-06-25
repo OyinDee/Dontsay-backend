@@ -1,4 +1,3 @@
-
 require("dotenv").config()
 const express= require('express') 
 const app = express();
@@ -12,13 +11,15 @@ const cors = require('cors')
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 const PORT = process.env.PORT
-const {login, getMessages, sendMessage, create, sendForgotPasswordMail, resetPassword, setRecoveryEmail}=require('./Controllers/User.controller')
+const {login, getMessages, sendMessage, create, sendForgotPasswordMail, resetPassword, setRecoveryEmail, authenticate}=require('./Controllers/User.controller')
 
 /**
  * @swagger
  * /user/set-recovery-email:
  *   post:
  *     summary: Set or update recovery email for a user
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -43,7 +44,14 @@ const {login, getMessages, sendMessage, create, sendForgotPasswordMail, resetPas
  *       500:
  *         description: Server error
  */
-app.post("/user/set-recovery-email", setRecoveryEmail);
+
+// Ensure body parsing middleware is loaded before any routes
+app.use(bodyParser.json({limit: '50mb', extended: true}));
+app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
+app.use(cors())
+app.use(express.urlencoded({limit: '50mb', extended: true}))
+
+app.post("/user/set-recovery-email", authenticate, setRecoveryEmail);
 
 // Swagger definition
 const swaggerDefinition = {
@@ -59,6 +67,15 @@ const swaggerDefinition = {
       description: 'Local server',
     },
   ],
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+    },
+  },
 };
 
 const options = {
@@ -235,10 +252,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
  */
 
 
-app.use(bodyParser.json({limit: '50mb', extended: true}));
-app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
-app.use(cors())
-app.use(express.urlencoded({limit: '50mb', extended: true}))
+
 mongoose.Query.prototype.timeout = 20000
 mongoose.connect(url)
     .then(()=>{
