@@ -22,6 +22,7 @@ const mailerService = new MailerService();
 const create = async (request, response) => {
   const username = request.body.username;
   const password = request.body.password;
+  const recoveryEmail = request.body.recoveryEmail;
 
   try {
     const existingUser = await userInfoModel.findOne({ username });
@@ -40,6 +41,7 @@ const create = async (request, response) => {
     const userPayload = {
       username,
       password: hashedPassword,
+      recoveryEmail,
     };
 
     const form = new userInfoModel(userPayload);
@@ -52,6 +54,25 @@ const create = async (request, response) => {
   } catch (err) {
     console.log(err.message);
     response.status(500).send({ stat: false, message: err.message });
+  }
+};
+
+// Set or update recovery email
+const setRecoveryEmail = async (req, res) => {
+  const { username, recoveryEmail } = req.body;
+  if (!username || !recoveryEmail) {
+    return res.status(400).send({ message: "username and recoveryEmail required" });
+  }
+  try {
+    const user = await userInfoModel.findOneAndUpdate(
+      { username },
+      { recoveryEmail },
+      { new: true }
+    );
+    if (!user) return res.status(404).send({ message: "User not found" });
+    res.status(200).send({ message: "Recovery email set", stat: true });
+  } catch (err) {
+    res.status(500).send({ message: err.message, stat: false });
   }
 };
 
@@ -146,12 +167,17 @@ const sendMessage = async (request, response) => {
 
 const sendForgotPasswordMail = async (req, res) => {
   try {
-    const { email, username } = req.body;
+    const { username } = req.body;
+    if (!username) return res.status(400).send({ message: "username required" });
     const existingUser = await userInfoModel.findOne({ username });
     if (!existingUser)
       return res.status(404).send({ message: "User not found" });
-    const code = generateForgotPasswordCode();
 
+    // Use recoveryEmail if set, else error
+    const email = existingUser.recoveryEmail;
+    if (!email) return res.status(400).send({ message: "No recovery email set for this user" });
+
+    const code = generateForgotPasswordCode();
     const existingCode = await forgotPasswordCodesModel.findOne({
       email,
       username,
@@ -170,22 +196,24 @@ const sendForgotPasswordMail = async (req, res) => {
         .status(500)
         .send({ message: "An error occurred. Try again later" });
 
-    const sendMail = await mailerService.sendForgotPasswordMail(
-      email,
-      code,
-      username
-    );
-    if (!sendMail)
-      return res
-        .status(500)
-        .send({ message: "An error occurred. Try again later" });
-
-    return res.status(200).send({ ...sendMail });
+    try {
+      const sendMail = await mailerService.sendForgotPasswordMail(
+        email,
+        code,
+        username
+      );
+      if (!sendMail)
+        return res
+          .status(500)
+          .send({ message: "An error occurred. Try again later" });
+      return res.status(200).send({ ...sendMail });
+    } catch (mailError) {
+      console.error("Mail sending error:", mailError);
+      return res.status(500).send({ message: "Failed to send email", stat: false });
+    }
   } catch (error) {
-    console.log(error);
-    res
-      .status(500)
-      .send({ message: "Internal server error", stat: false });
+    console.error("Forgot password error:", error);
+    res.status(500).send({ message: "Internal server error", stat: false });
   }
 };
 
@@ -222,5 +250,6 @@ module.exports = {
   create,
   login,
   sendForgotPasswordMail,
-  resetPassword
+  resetPassword,
+  setRecoveryEmail
 };
