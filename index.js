@@ -57,9 +57,9 @@ app.post("/user/set-recovery-email", authenticate, setRecoveryEmail);
 const swaggerDefinition = {
   openapi: '3.0.0',
   info: {
-    title: 'DontSay Backend API',
+    title: 'Wispah Backend API',
     version: '1.0.0',
-    description: 'API documentation for DontSay backend',
+    description: 'API documentation for Wispah backend',
   },
   servers: [
     {
