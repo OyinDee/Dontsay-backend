@@ -194,13 +194,10 @@ const sendForgotPasswordMail = async (req, res) => {
     const email = existingUser.recoveryEmail;
     if (!email) return res.status(400).send({ message: "No recovery email set for this user" });
 
-    const code = generateForgotPasswordCode();
-    const existingCode = await forgotPasswordCodesModel.findOne({
-      email,
-      username,
-    });
-    if (existingCode) return res.status(400).send({ message: "Code already sent" });
+    // Always allow sending a new code: delete any existing code for this user/email
+    await forgotPasswordCodesModel.deleteMany({ email, username });
 
+    const code = generateForgotPasswordCode();
     const newUserCode = {
       email,
       username,
