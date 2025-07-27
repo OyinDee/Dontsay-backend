@@ -71,11 +71,12 @@ const authenticate = (req, res, next) => {
 
 // Set or update recovery email (guarded)
 const setRecoveryEmail = async (req, res) => {
-  if (!req.body) return res.status(400).send({ message: "Missing request body" });
-  const { username, recoveryEmail } = req.body || {};
+  const { username, recoveryEmail } = req.body;
   if (!username || !recoveryEmail) {
     return res.status(400).send({ message: "username and recoveryEmail required" });
   }
+  console.log(req.body);
+  // if (!req.body) return res.status(400).send({ message: "Missing request body" });
   // Only allow user to set their own recovery email
   if (!req.user || req.user.username !== username) {
     return res.status(403).send({ message: "Forbidden: You can only set your own recovery email" });
