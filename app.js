@@ -4,6 +4,11 @@
  * index.js calls createApp() then server.listen().
  */
 require("dotenv").config();
+const mongoose = require("mongoose");
+
+// Reduce the default buffering timeout so hung DB operations fail fast
+// instead of silently waiting for 10s+ on every request during an outage.
+mongoose.set("bufferTimeoutMS", 8000);
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -31,6 +36,7 @@ const {
   getThread,
   replyThread,
   sendAnonMessage,
+  startThreadFromMessage,
   claimThread,
 } = require("./Controllers/Anon.controller");
 
@@ -51,6 +57,19 @@ function createApp() {
   });
 
   app.set("io", io);
+
+  // ── Health check ───────────────────────────────────────────
+  // Used by Render's health check and by the uptime monitor that keeps the
+  // free instance awake. Deliberately does not touch Mongo so it answers
+  // instantly and stays 200 while the DB is reconnecting.
+  app.get("/health", (req, res) => {
+    const states = ["disconnected", "connected", "connecting", "disconnecting"];
+    res.status(200).json({
+      ok: true,
+      uptime: Math.round(process.uptime()),
+      db: states[mongoose.connection.readyState] || "unknown",
+    });
+  });
 
   // ── Socket.IO ──────────────────────────────────────────────
   io.on("connection", (socket) => {
@@ -123,6 +142,7 @@ function createApp() {
   app.get("/anon/thread/:threadId", authenticate, getThread);
   app.post("/anon/reply", authenticate, replyThread);
   app.post("/anon/send", authenticate, sendAnonMessage);
+  app.post("/anon/thread/from-message", authenticate, startThreadFromMessage);
   app.post("/anon/claim-thread", authenticate, claimThread);
 
   return { app, server, io };

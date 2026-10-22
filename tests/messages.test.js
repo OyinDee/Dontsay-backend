@@ -115,17 +115,12 @@ describe("POST /send", () => {
     expect(new Date(ctorArg.expiresAt).getTime()).toBeGreaterThan(before + 3599 * 1000);
   });
 
-  it("creates anon thread when bccEmail provided and allowAnonymousChat is on", async () => {
+  it("stores the sender reply email but does not create a thread yet", async () => {
     userInfoModel.findOne.mockResolvedValue(
       mockUser({ allowAnonymousChat: true })
     );
     messagesModel.prototype.save = jest.fn().mockResolvedValue(mockMessage());
-    anonThreadModel.create = jest.fn().mockResolvedValue({
-      _id: { toString: () => "thread001" },
-      recipientUsername: "recipient",
-      senderAlias: "SilentFox#4821",
-      status: "pending_sender_account",
-    });
+    anonThreadModel.create = jest.fn();
 
     const res = await request(app)
       .post("/send")
@@ -136,11 +131,13 @@ describe("POST /send", () => {
       });
 
     expect(res.body.stat).toBe(true);
-    expect(res.body.threadId).toBe("thread001");
-    expect(anonThreadModel.create).toHaveBeenCalledTimes(1);
+    expect(res.body.threadId).toBeUndefined();
+    expect(anonThreadModel.create).not.toHaveBeenCalled();
+    const ctorArg = messagesModel.mock.calls[0][0];
+    expect(ctorArg.bccEmail).toBe("sender@example.com");
   });
 
-  it("does NOT create anon thread when allowAnonymousChat is off", async () => {
+  it("does not store the reply email when allowAnonymousChat is off", async () => {
     userInfoModel.findOne.mockResolvedValue(mockUser({ allowAnonymousChat: false }));
     messagesModel.prototype.save = jest.fn().mockResolvedValue(mockMessage());
     anonThreadModel.create = jest.fn();
@@ -156,6 +153,8 @@ describe("POST /send", () => {
     expect(res.body.stat).toBe(true);
     expect(res.body.threadId).toBeUndefined();
     expect(anonThreadModel.create).not.toHaveBeenCalled();
+    const ctorArg = messagesModel.mock.calls[0][0];
+    expect(ctorArg.bccEmail).toBeNull();
   });
 });
 

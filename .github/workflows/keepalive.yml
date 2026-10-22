@@ -1,0 +1,42 @@
+name: keep-alive
+
+# Render free web services sleep after 15 minutes without inbound traffic.
+# This workflow pings the health endpoint so the API stays warm.
+#
+# Setup: repo Settings > Secrets and variables > Actions > Variables >
+#   WISPA_HEALTH_URL = https://<your-service>.onrender.com/health
+#
+# Caveats: GitHub's scheduler can run late by 5-15 minutes under load, and
+# scheduled workflows are disabled after 60 days without repo activity.
+# For production-grade timing use an uptime monitor (UptimeRobot, cron-job.org)
+# at a 5-minute interval instead, or in addition.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        env:
+          URL: ${{ vars.WISPA_HEALTH_URL }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "WISPA_HEALTH_URL is not set" >&2
+            exit 1
+          fi
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 "$URL" || true)
+            echo "attempt $i -> ${code:-000}"
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 25
+          done
+          echo "health check failed after 3 attempts" >&2
+          exit 1

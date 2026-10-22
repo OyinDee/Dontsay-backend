@@ -1,13 +1,11 @@
 const { userInfoModel } = require("../Models/User.model");
 const { messagesModel } = require("../Models/Messages.model");
-const { anonThreadModel } = require("../Models/AnonThread.model");
 const { uploadToCloudinary } = require("../Utils/Cloudinary.utils");
 const bcryptjs = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const MailerService = require("../Services/Mailer.Services");
 const { generateForgotPasswordCode } = require("../Utils/CodeGenerator.utils");
 const { forgotPasswordCodesModel } = require("../Models/ForgotPasswordCodes.model");
-const { generateAlias } = require("../Utils/AliasGenerator.utils");
 const argon2 = require("argon2");
 require("dotenv").config();
 
@@ -130,6 +128,8 @@ const getMessages = async (request, response) => {
       time: m.time,
       expiresAt: m.expiresAt || null,
       read: m.read,
+      threadId: m.threadId || null,
+      canReply: Boolean(m.bccEmail),
     }));
 
     response.status(200).send({ message: shaped, username, stat: true, settings });
@@ -175,6 +175,9 @@ const sendMessage = async (request, response) => {
       time: time || Date.now(),
       title: title || null,
       expiresAt,
+      // Only stored when the recipient allows anonymous chat. Used when the
+      // recipient chooses to reply — no conversation is created here.
+      bccEmail: userExists.allowAnonymousChat ? (bccEmail || null) : null,
     });
 
     const saved = await newMessage.save();
@@ -194,59 +197,7 @@ const sendMessage = async (request, response) => {
       io.to(username).emit("new_wispa", shaped);
     }
 
-    // Anon thread creation if bccEmail provided and user allows anon chat
-    let threadId = undefined;
-    if (bccEmail && userExists.allowAnonymousChat) {
-      const alias = generateAlias();
-
-      // Check if the bccEmail belongs to an existing Wispa account
-      const existingSender = await userInfoModel.findOne({ recoveryEmail: bccEmail });
-
-      let claimToken = null;
-      let status = "pending_sender_account";
-      let senderIdentity = null;
-      let claimed = false;
-
-      if (existingSender) {
-        // Auto-link — no claim step needed
-        status = "active";
-        senderIdentity = existingSender.username;
-        claimed = true;
-      } else {
-        // Generate a one-time claim token for the email flow
-        claimToken = jwt.sign(
-          { bccEmail, alias },
-          process.env.JWT_SECRET,
-          { expiresIn: "7d" }
-        );
-      }
-
-      const thread = await anonThreadModel.create({
-        recipientUsername: username,
-        senderAlias: alias,
-        senderBccEmail: bccEmail,
-        bccEmail,
-        status,
-        claimToken,
-        senderIdentity,
-        claimed,
-      });
-
-      threadId = thread._id.toString();
-
-      if (!existingSender) {
-        // Only email users who don't have an account yet
-        const claimLink = `https://wispain.vercel.app/claim?token=${claimToken}&threadId=${threadId}`;
-        try {
-          await mailerService.sendAnonClaimMail(bccEmail, alias, username, claimLink);
-        } catch (mailErr) {
-          console.error("Anon claim email failed:", mailErr.message);
-        }
-      }
-    }
-
     const resp = { stat: true, message: "Sent" };
-    if (threadId) resp.threadId = threadId;
     return response.status(200).send(resp);
   } catch (err) {
     console.log(err.message);

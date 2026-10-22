@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Someone sent you a secret on Wispa</title>
+  <title>{{recipientUsername}} replied to your secret on Wispa</title>
   <!--[if mso]>
   <noscript>
     <xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
@@ -42,10 +42,10 @@
 
               <!-- Heading -->
               <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#ffffff;text-align:center;letter-spacing:-0.3px;">
-                Someone sent you a secret whisper
+                {{recipientUsername}} replied to your secret
               </h1>
               <p style="margin:0 0 32px;font-size:14px;color:rgba(255,255,255,0.45);text-align:center;line-height:1.6;">
-                An anonymous message just landed for&nbsp;<strong style="color:rgba(255,255,255,0.75);">{{recipientUsername}}</strong>&nbsp;on Wispa.
+                You sent an anonymous message to&nbsp;<strong style="color:rgba(255,255,255,0.75);">{{recipientUsername}}</strong>&nbsp;on Wispa, and they&rsquo;ve replied.
               </p>
 
               <!-- Alias card -->
@@ -80,12 +80,12 @@
                 <tr>
                   <td style="padding:28px 0 24px;">
                     <p style="margin:0 0 10px;font-size:16px;font-weight:700;color:#ffffff;">
-                      Want to hear back? 💬
+                      Read their reply
                     </p>
                     <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.50);line-height:1.7;">
-                      Create a free Wispa account to claim this thread. Once you do,
-                      <strong style="color:rgba(255,255,255,0.75);">{{recipientUsername}}</strong> can reply and you'll get
-                      notified — anonymously, of course. They'll only ever see
+                      Create a free Wispa account and claim this thread to read what
+                      <strong style="color:rgba(255,255,255,0.75);">{{recipientUsername}}</strong> wrote back.
+                      Keep chatting anonymously — they'll only ever see
                       <strong style="color:#4aae87;">{{alias}}</strong>.
                     </p>
                   </td>
@@ -98,7 +98,7 @@
                   <td align="center" style="padding-bottom:28px;">
                     <a href="{{claimLink}}"
                        style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#217552,#2d9268);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;border-radius:12px;letter-spacing:0.2px;">
-                      Create account &amp; claim thread →
+                      Create account &amp; read reply →
                     </a>
                   </td>
                 </tr>

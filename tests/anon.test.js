@@ -15,9 +15,17 @@ jest.mock("../Models/Messages.model");
 jest.mock("../Models/AnonThread.model");
 jest.mock("../Models/AnonMessage.model");
 jest.mock("../Models/ForgotPasswordCodes.model");
+jest.mock("../Services/Mailer.Services", () =>
+  jest.fn().mockImplementation(() => ({
+    sendAnonClaimMail: jest.fn().mockResolvedValue({ success: true }),
+    sendForgotPasswordMail: jest.fn().mockResolvedValue({ success: true }),
+  }))
+);
 
 const { anonThreadModel } = require("../Models/AnonThread.model");
 const { anonMessageModel } = require("../Models/AnonMessage.model");
+const { messagesModel } = require("../Models/Messages.model");
+const { userInfoModel } = require("../Models/User.model");
 
 let app, server;
 
@@ -275,6 +283,120 @@ describe("POST /anon/send", () => {
 });
 
 // ── POST /anon/claim-thread ───────────────────────────────────
+describe("POST /anon/thread/from-message", () => {
+  const token = signToken(RECIPIENT);
+
+  const mockInboxMessage = (overrides = {}) => ({
+    _id: "msg001",
+    username: RECIPIENT,
+    message: "hey there",
+    title: null,
+    imageURL: null,
+    time: new Date("2026-01-01T00:00:00Z"),
+    expiresAt: null,
+    threadId: null,
+    bccEmail: "sender@example.com",
+    save: jest.fn().mockResolvedValue(true),
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    userInfoModel.findOne.mockResolvedValue({
+      username: RECIPIENT,
+      allowAnonymousChat: true,
+    });
+    anonThreadModel.create.mockResolvedValue({
+      _id: { toString: () => THREAD_ID },
+      senderAlias: "SilentFox#4821",
+      status: "pending_sender_account",
+      save: jest.fn().mockResolvedValue(true),
+    });
+    anonMessageModel.create.mockResolvedValue({});
+  });
+
+  it("creates a thread with the original message as its first message", async () => {
+    const inboxMsg = mockInboxMessage();
+    messagesModel.findById.mockResolvedValue(inboxMsg);
+
+    const res = await request(app)
+      .post("/anon/thread/from-message")
+      .set(authHeader(token))
+      .send({ messageId: "msg001" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.stat).toBe(true);
+    expect(res.body.threadId).toBe(THREAD_ID);
+    expect(anonMessageModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        threadId: expect.anything(),
+        senderRole: "sender",
+        content: "hey there",
+      })
+    );
+    expect(inboxMsg.threadId).toBeDefined();
+    expect(inboxMsg.save).toHaveBeenCalled();
+  });
+
+  it("does not assign the sender a username before they claim", async () => {
+    messagesModel.findById.mockResolvedValue(mockInboxMessage());
+
+    await request(app)
+      .post("/anon/thread/from-message")
+      .set(authHeader(token))
+      .send({ messageId: "msg001" });
+
+    expect(anonThreadModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        senderIdentity: null,
+        claimed: false,
+        status: "pending_sender_account",
+      })
+    );
+  });
+
+  it("is idempotent — reopens an existing thread instead of duplicating it", async () => {
+    messagesModel.findById.mockResolvedValue(
+      mockInboxMessage({ threadId: THREAD_ID })
+    );
+    anonThreadModel.findById.mockResolvedValue(mockThread());
+
+    const res = await request(app)
+      .post("/anon/thread/from-message")
+      .set(authHeader(token))
+      .send({ messageId: "msg001" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.threadId).toBe(THREAD_ID);
+    expect(anonThreadModel.create).not.toHaveBeenCalled();
+    expect(anonMessageModel.create).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when the message belongs to someone else", async () => {
+    messagesModel.findById.mockResolvedValue(
+      mockInboxMessage({ username: "someoneelse" })
+    );
+
+    const res = await request(app)
+      .post("/anon/thread/from-message")
+      .set(authHeader(token))
+      .send({ messageId: "msg001" });
+
+    expect(res.status).toBe(403);
+    expect(anonThreadModel.create).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for an unknown message", async () => {
+    messagesModel.findById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post("/anon/thread/from-message")
+      .set(authHeader(token))
+      .send({ messageId: "nope" });
+
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("POST /anon/claim-thread", () => {
   const token = signToken(SENDER);
 

@@ -63,7 +63,7 @@ class MailerService{
             await this.transporter.sendMail({
                 from: this.#EMAIL,
                 to: bccEmail,
-                subject: "Someone sent you an anonymous message on Wispah — claim your thread",
+                subject: `${recipientUsername} replied to your anonymous message on Wispa — claim your thread`,
                 html,
             });
             return { success: true, message: "Claim email sent." };
@@ -74,5 +74,4 @@ class MailerService{
 }
 
 module.exports = MailerService
-
 

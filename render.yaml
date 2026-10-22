@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: wispa-api
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci
+    startCommand: node index.js
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Secrets: set these in the Render dashboard (sync: false keeps them
+      # out of the repo).
+      - key: URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: EMAIL
+        sync: false
+      - key: PASSWORD
+        sync: false
+      - key: CLOUD_NAME
+        sync: false
+      - key: API_KEY
+        sync: false
+      - key: API_SECRET
+        sync: false
+      # Optional DB retry tuning (defaults in index.js are fine).
+      - key: DB_MAX_ATTEMPTS
+        value: "3"
+      - key: DB_SELECTION_TIMEOUT_MS
+        value: "3000"

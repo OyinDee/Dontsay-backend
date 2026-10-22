@@ -9,6 +9,11 @@ const messagesSchema = mongoose.Schema({
     read:      { type: Boolean, default: false },
     readAt:    { type: Date, default: null },
     expiresAt: { type: Date, default: null },      // TTL — null means never expires
+    // Sender's email — kept only so the recipient can reach them if they
+    // choose to reply. Never exposed in API responses.
+    bccEmail:  { type: String, default: null },
+    // Set when the recipient starts an anonymous conversation from this message.
+    threadId:  { type: mongoose.Schema.Types.ObjectId, ref: "anonthread", default: null },
 }, { timestamps: true });
 
 // Sparse TTL index: MongoDB auto-deletes docs where expiresAt <= now

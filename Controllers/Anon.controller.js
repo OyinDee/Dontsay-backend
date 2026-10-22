@@ -1,8 +1,15 @@
 const jwt = require("jsonwebtoken");
 const { anonThreadModel } = require("../Models/AnonThread.model");
 const { anonMessageModel } = require("../Models/AnonMessage.model");
+const { messagesModel } = require("../Models/Messages.model");
 const { userInfoModel } = require("../Models/User.model");
+const { generateAlias } = require("../Utils/AliasGenerator.utils");
+const MailerService = require("../Services/Mailer.Services");
 require("dotenv").config();
+
+const mailerService = new MailerService();
+
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://wispah.vercel.app";
 
 // ─── GET /anon/threads ────────────────────────────────────────────────────────
 // Returns all threads where the logged-in user is recipient OR claimed sender.
@@ -148,7 +155,19 @@ const replyThread = async (req, res) => {
       });
     }
 
-    res.status(200).send({ stat: true });
+    res.status(200).send({
+      stat: true,
+      message: {
+        _id: msg._id,
+        senderRole: msg.senderRole,
+        content: msg.content,
+        title: msg.title || null,
+        imageURL: msg.imageURL || null,
+        read: msg.read,
+        expiresAt: msg.expiresAt || null,
+        createdAt: msg.createdAt,
+      },
+    });
   } catch (err) {
     res.status(500).send({ message: err.message, stat: false });
   }
@@ -203,13 +222,118 @@ const sendAnonMessage = async (req, res) => {
       });
     }
 
-    res.status(200).send({ stat: true });
+    res.status(200).send({
+      stat: true,
+      message: {
+        _id: msg._id,
+        senderRole: msg.senderRole,
+        content: msg.content,
+        title: msg.title || null,
+        imageURL: msg.imageURL || null,
+        read: msg.read,
+        expiresAt: msg.expiresAt || null,
+        createdAt: msg.createdAt,
+      },
+    });
   } catch (err) {
     res.status(500).send({ message: err.message, stat: false });
   }
 };
 
 // ─── POST /anon/claim-thread ──────────────────────────────────────────────────
+
+// ─── POST /anon/thread/from-message ───────────────────────────────────────────
+// The recipient explicitly chooses to reply to an inbox message. Only now is a
+// conversation created, and the original anonymous message becomes its first
+// entry. The sender is never assigned a username here — they must claim the
+// thread themselves (via the emailed link) before their account is linked.
+
+const startThreadFromMessage = async (req, res) => {
+  try {
+    const { username } = req.user;
+    const { messageId } = req.body;
+
+    const message = await messagesModel.findById(messageId);
+    if (!message) return res.status(404).send({ message: "Message not found", stat: false });
+    if (message.username !== username) {
+      return res.status(403).send({ message: "Forbidden", stat: false });
+    }
+
+    // Idempotent — clicking Reply again opens the existing conversation.
+    if (message.threadId) {
+      const existing = await anonThreadModel.findById(message.threadId);
+      if (existing) {
+        return res.status(200).send({
+          stat: true,
+          threadId: existing._id.toString(),
+          senderAlias: existing.senderAlias,
+          status: existing.status,
+        });
+      }
+    }
+
+    const user = await userInfoModel.findOne({ username });
+    if (user && user.allowAnonymousChat === false) {
+      return res.status(403).send({
+        message: "Anonymous replies are turned off for this account",
+        stat: false,
+      });
+    }
+
+    const alias = generateAlias();
+    const thread = await anonThreadModel.create({
+      recipientUsername: username,
+      senderAlias: alias,
+      senderBccEmail: message.bccEmail || null,
+      bccEmail: message.bccEmail || null,
+      status: "pending_sender_account",
+      senderIdentity: null,
+      claimed: false,
+      claimToken: null,
+    });
+
+    // The anonymous message that started it all is the first message.
+    await anonMessageModel.create({
+      threadId: thread._id,
+      fromAlias: alias,
+      senderRole: "sender",
+      content: message.message,
+      title: message.title || null,
+      imageURL: message.imageURL || null,
+      expiresAt: message.expiresAt || null,
+      createdAt: message.time || message.createdAt,
+    });
+
+    if (message.bccEmail) {
+      const claimToken = jwt.sign(
+        { threadId: thread._id.toString(), bccEmail: message.bccEmail },
+        process.env.JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+      thread.claimToken = claimToken;
+      await thread.save();
+
+      const claimLink = `${FRONTEND_URL}/claim?token=${claimToken}&threadId=${thread._id}`;
+      try {
+        await mailerService.sendAnonClaimMail(message.bccEmail, alias, username, claimLink);
+      } catch (mailErr) {
+        console.error("Anon claim email failed:", mailErr.message);
+      }
+    }
+
+    message.threadId = thread._id;
+    await message.save();
+
+    return res.status(200).send({
+      stat: true,
+      threadId: thread._id.toString(),
+      senderAlias: alias,
+      status: thread.status,
+    });
+  } catch (err) {
+    res.status(500).send({ message: err.message, stat: false });
+  }
+};
 
 const claimThread = async (req, res) => {
   try {
@@ -245,5 +369,6 @@ module.exports = {
   getThread,
   replyThread,
   sendAnonMessage,
+  startThreadFromMessage,
   claimThread,
 };
