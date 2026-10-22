@@ -44,6 +44,33 @@ class MailerService{
             throw error;
         }
     }
+
+    /**
+     * Sends the anonymous thread claim email to a BCC address.
+     * @param {string} bccEmail - recipient of the email
+     * @param {string} alias    - the sender's generated alias, e.g. "SilentFox#4821"
+     * @param {string} recipientUsername - the Wispah user they messaged
+     * @param {string} claimLink - full URL with claimToken, e.g. https://app.wispah.com/claim?token=...
+     */
+    sendAnonClaimMail = async (bccEmail, alias, recipientUsername, claimLink) => {
+        try {
+            const html = await this.#getTemplate("anonClaim", {
+                alias,
+                recipientUsername,
+                claimLink,
+            });
+
+            await this.transporter.sendMail({
+                from: this.#EMAIL,
+                to: bccEmail,
+                subject: "Someone sent you an anonymous message on Wispah — claim your thread",
+                html,
+            });
+            return { success: true, message: "Claim email sent." };
+        } catch (error) {
+            throw error;
+        }
+    }
 }
 
 module.exports = MailerService

@@ -1,278 +1,169 @@
-require("dotenv").config()
-const express= require('express') 
+require("dotenv").config();
+const express = require("express");
 const app = express();
-const bodyParser=require('body-parser')
-const mongoose = require('mongoose')
-const { MongoClient, ServerApiVersion } = require('mongodb')
-const url=process.env.URI
-const bcryptjs= require('bcryptjs')
-const jwt = require('jsonwebtoken')
-const cors = require('cors')
-const swaggerUi = require('swagger-ui-express');
-const swaggerJsdoc = require('swagger-jsdoc');
-const PORT = process.env.PORT
-const {login, getMessages, sendMessage, create, sendForgotPasswordMail, resetPassword, setRecoveryEmail, authenticate}=require('./Controllers/User.controller')
+const http = require("http");
+const { Server } = require("socket.io");
+const bodyParser = require("body-parser");
+const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const cors = require("cors");
 
-/**
- * @swagger
- * /user/set-recovery-email:
- *   post:
- *     summary: Set or update recovery email for a user
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - username
- *               - recoveryEmail
- *             properties:
- *               username:
- *                 type: string
- *               recoveryEmail:
- *                 type: string
- *     responses:
- *       200:
- *         description: Recovery email set
- *       400:
- *         description: Missing username or recoveryEmail
- *       404:
- *         description: User not found
- *       500:
- *         description: Server error
- */
+const PORT = process.env.PORT || 3000;
 
-// Ensure body parsing middleware is loaded before any routes
-app.use(bodyParser.json({limit: '50mb', extended: true}));
-app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
-app.use(cors())
-app.use(express.urlencoded({limit: '50mb', extended: true}))
+// ─── Controllers ──────────────────────────────────────────────────────────────
+const {
+  login,
+  getMessages,
+  sendMessage,
+  create,
+  sendForgotPasswordMail,
+  resetPassword,
+  setRecoveryEmail,
+  authenticate,
+  getUserProfile,
+  updateSettings,
+  markMessagesRead,
+  deleteMessage,
+} = require("./Controllers/User.controller");
 
-app.post("/user/set-recovery-email", authenticate, setRecoveryEmail);
+const {
+  getThreads,
+  getThread,
+  replyThread,
+  sendAnonMessage,
+  claimThread,
+} = require("./Controllers/Anon.controller");
 
-// Swagger definition
-const swaggerDefinition = {
-  openapi: '3.0.0',
-  info: {
-    title: 'Wispah Backend API',
-    version: '1.0.0',
-    description: 'API documentation for Wispah backend',
-  },
-  servers: [
-    {
-      url: 'http://localhost:' + PORT,
-      description: 'Local server',
-    },
-  ],
-  components: {
-    securitySchemes: {
-      bearerAuth: {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-      },
-    },
-  },
-};
+// ─── Models (for Socket.IO presence updates) ──────────────────────────────────
+const { userInfoModel } = require("./Models/User.model");
+const { anonThreadModel } = require("./Models/AnonThread.model");
 
-const options = {
-  swaggerDefinition,
-  apis: ['./index.js'],
-};
-const swaggerSpec = swaggerJsdoc(options);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-/**
- * @swagger
- * /user/create:
- *   post:
- *     summary: Create a new user
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - username
- *               - password
- *             properties:
- *               username:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: User created successfully
- *       500:
- *         description: Server error
- */
-/**
- * @swagger
- * /user/login:
- *   post:
- *     summary: Login a user
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - username
- *               - password
- *             properties:
- *               username:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Login successful
- *       500:
- *         description: Server error
- */
-/**
- * @swagger
- * /get:
- *   post:
- *     summary: Get user messages
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - token
- *             properties:
- *               token:
- *                 type: string
- *     responses:
- *       200:
- *         description: Messages retrieved
- *       400:
- *         description: Session expired
- *       500:
- *         description: Server error
- */
-/**
- * @swagger
- * /send:
- *   post:
- *     summary: Send a message
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - message
- *               - username
- *               - time
- *             properties:
- *               img:
- *                 type: string
- *                 description: base64 image (optional)
- *               message:
- *                 type: string
- *               username:
- *                 type: string
- *               time:
- *                 type: string
- *     responses:
- *       200:
- *         description: Message sent
- *       400:
- *         description: Error
- */
-/**
- * @swagger
- * /user/forgot-password:
- *   post:
- *     summary: Send forgot password code
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - username
- *             properties:
- *               email:
- *                 type: string
- *               username:
- *                 type: string
- *     responses:
- *       200:
- *         description: Code sent
- *       400:
- *         description: Code already sent
- *       404:
- *         description: User not found
- *       500:
- *         description: Server error
- */
-/**
- * @swagger
- * /user/reset-password:
- *   post:
- *     summary: Reset user password
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - code
- *               - newPassword
- *               - username
- *             properties:
- *               code:
- *                 type: string
- *               newPassword:
- *                 type: string
- *               username:
- *                 type: string
- *     responses:
- *       200:
- *         description: Password updated
- *       400:
- *         description: Invalid code
- *       404:
- *         description: User not found
- *       500:
- *         description: Server error
- */
+// ─── Middleware ───────────────────────────────────────────────────────────────
+app.use(bodyParser.json({ limit: "50mb", extended: true }));
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+app.use(cors());
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+// ─── HTTP + Socket.IO server ──────────────────────────────────────────────────
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "*", methods: ["GET", "POST"] },
+});
 
+// Make io accessible inside route handlers via req.app.get("io")
+app.set("io", io);
 
-mongoose.Query.prototype.timeout = 20000
-mongoose.connect(url)
-    .then(()=>{
-        console.log("MONGODB has connected");  
-    })
-    .catch((err)=>{
-        console.log(err);
-        console.log("Error in mongodb connection");
-    })
+// ─── MongoDB ──────────────────────────────────────────────────────────────────
+mongoose.Query.prototype.timeout = 20000;
+mongoose
+  .connect(process.env.URI)
+  .then(() => console.log("MONGODB has connected"))
+  .catch((err) => console.log("Error in mongodb connection", err));
 
+// ─── Socket.IO ────────────────────────────────────────────────────────────────
+io.on("connection", (socket) => {
+  console.log("Socket connected:", socket.id);
 
+  // 1. Client emits authenticate { token }
+  socket.on("authenticate", async ({ token }) => {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const { username } = decoded;
 
+      socket.username = username;
+      socket.join(username); // join personal room
+      console.log(`${username} authenticated via socket`);
+
+      // Mark online
+      await userInfoModel.findOneAndUpdate(
+        { username },
+        { isOnline: true, lastSeen: new Date() }
+      );
+
+      // Broadcast presence
+      io.emit("presence", { username, isOnline: true, lastSeen: new Date() });
+    } catch (err) {
+      console.error("Socket auth error:", err.message);
+      socket.disconnect(true);
+    }
+  });
+
+  // 2. Typing event — forward to the other participant
+  socket.on("typing", async ({ threadId }) => {
+    try {
+      if (!socket.username) return;
+
+      const thread = await anonThreadModel.findById(threadId);
+      if (!thread) return;
+
+      // Determine the other party's room
+      const otherRoom =
+        thread.recipientUsername === socket.username
+          ? thread.senderIdentity
+          : thread.recipientUsername;
+
+      if (otherRoom) {
+        io.to(otherRoom).emit("typing", {
+          threadId,
+          alias:
+            thread.recipientUsername === socket.username
+              ? socket.username
+              : thread.senderAlias,
+        });
+      }
+    } catch (err) {
+      console.error("Socket typing error:", err.message);
+    }
+  });
+
+  // 3. Disconnect — mark offline, update lastSeen
+  socket.on("disconnect", async () => {
+    if (!socket.username) return;
+    const lastSeen = new Date();
+    try {
+      await userInfoModel.findOneAndUpdate(
+        { username: socket.username },
+        { isOnline: false, lastSeen }
+      );
+      io.emit("presence", {
+        username: socket.username,
+        isOnline: false,
+        lastSeen,
+      });
+      console.log(`${socket.username} disconnected`);
+    } catch (err) {
+      console.error("Disconnect update error:", err.message);
+    }
+  });
+});
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
+
+// Existing — must not break
 app.post("/user/create", create);
 app.post("/user/login", login);
-app.post("/get", getMessages)
-app.post("/send", sendMessage)
-app.post("/user/forgot-password", sendForgotPasswordMail)
-app.post("/user/reset-password", resetPassword)
+app.post("/get", getMessages);
+app.post("/send", sendMessage);
+app.post("/user/forgot-password", sendForgotPasswordMail);
+app.post("/user/reset-password", resetPassword);
+app.post("/user/set-recovery-email", authenticate, setRecoveryEmail);
 
+// New user / settings
+app.get("/user/:username/profile", getUserProfile);
+app.post("/user/update-settings", authenticate, updateSettings);
 
-app.listen(PORT,( )=>{
-    console.log(`app listening on PORT ${PORT}`)
-})
+// Message management
+app.post("/message/mark-read", authenticate, markMessagesRead);
+app.delete("/message/:id", authenticate, deleteMessage);
+
+// Anon chat
+app.get("/anon/threads", authenticate, getThreads);
+app.get("/anon/thread/:threadId", authenticate, getThread);
+app.post("/anon/reply", authenticate, replyThread);
+app.post("/anon/send", authenticate, sendAnonMessage);
+app.post("/anon/claim-thread", authenticate, claimThread);
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+server.listen(PORT, () => {
+  console.log(`app listening on PORT ${PORT}`);
+});

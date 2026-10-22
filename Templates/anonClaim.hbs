@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Someone sent you a secret on Wispa</title>
+  <!--[if mso]>
+  <noscript>
+    <xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml>
+  </noscript>
+  <![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#0f1117;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;">
+
+  <!-- Outer wrapper -->
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color:#0f1117;min-height:100vh;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+
+        <!-- Card -->
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;">
+
+          <!-- Header glow bar -->
+          <tr>
+            <td style="background:linear-gradient(90deg,#1a5c3e 0%,#2d9268 50%,#1a5c3e 100%);height:4px;border-radius:4px 4px 0 0;"></td>
+          </tr>
+
+          <!-- Card body -->
+          <tr>
+            <td style="background-color:#1c1f2e;border-radius:0 0 20px 20px;padding:40px 40px 36px;border:1px solid rgba(255,255,255,0.08);border-top:none;">
+
+              <!-- Ghost icon -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="padding-bottom:28px;">
+                    <div style="display:inline-block;background:linear-gradient(135deg,#1a5c3e,#2d9268);border-radius:20px;width:64px;height:64px;line-height:64px;text-align:center;font-size:32px;">
+                      👻
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Heading -->
+              <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#ffffff;text-align:center;letter-spacing:-0.3px;">
+                Someone sent you a secret whisper
+              </h1>
+              <p style="margin:0 0 32px;font-size:14px;color:rgba(255,255,255,0.45);text-align:center;line-height:1.6;">
+                An anonymous message just landed for&nbsp;<strong style="color:rgba(255,255,255,0.75);">{{recipientUsername}}</strong>&nbsp;on Wispa.
+              </p>
+
+              <!-- Alias card -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="background-color:rgba(45,146,104,0.10);border:1px solid rgba(45,146,104,0.25);border-radius:14px;padding:20px 24px;">
+                    <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:rgba(74,174,135,0.8);">
+                      Your anonymous alias
+                    </p>
+                    <p style="margin:0;font-size:20px;font-weight:800;color:#4aae87;letter-spacing:0.5px;">
+                      {{alias}}
+                    </p>
+                    <p style="margin:8px 0 0;font-size:12px;color:rgba(255,255,255,0.35);line-height:1.5;">
+                      This is the only name <strong style="color:rgba(255,255,255,0.55);">{{recipientUsername}}</strong> will ever see.
+                      Your real identity stays completely hidden.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Divider -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="padding:28px 0 0;">
+                    <div style="height:1px;background:rgba(255,255,255,0.07);"></div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Want to hear back? -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="padding:28px 0 24px;">
+                    <p style="margin:0 0 10px;font-size:16px;font-weight:700;color:#ffffff;">
+                      Want to hear back? 💬
+                    </p>
+                    <p style="margin:0;font-size:14px;color:rgba(255,255,255,0.50);line-height:1.7;">
+                      Create a free Wispa account to claim this thread. Once you do,
+                      <strong style="color:rgba(255,255,255,0.75);">{{recipientUsername}}</strong> can reply and you'll get
+                      notified — anonymously, of course. They'll only ever see
+                      <strong style="color:#4aae87;">{{alias}}</strong>.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA Button -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="padding-bottom:28px;">
+                    <a href="{{claimLink}}"
+                       style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#217552,#2d9268);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;border-radius:12px;letter-spacing:0.2px;">
+                      Create account &amp; claim thread →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Fine print -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="background-color:rgba(255,255,255,0.03);border-radius:10px;padding:14px 18px;">
+                    <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.28);line-height:1.7;">
+                      🔒&nbsp; This link expires in <strong style="color:rgba(255,255,255,0.45);">7 days</strong>.<br/>
+                      🙈&nbsp; We will never reveal your email to {{recipientUsername}}.<br/>
+                      🚫&nbsp; Didn't send this message? Just ignore this email.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding-top:28px;padding-bottom:8px;">
+              <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:0.5px;">
+                WISPA
+              </p>
+              <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.20);">
+                Say it anonymously. No traces. No regrets.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Card -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
