@@ -255,7 +255,7 @@ const startThreadFromMessage = async (req, res) => {
 
     const message = await messagesModel.findById(messageId);
     if (!message) return res.status(404).send({ message: "Message not found", stat: false });
-    if (message.username !== username) {
+    if (message.username.toLowerCase() !== username.toLowerCase()) {
       return res.status(403).send({ message: "Forbidden", stat: false });
     }
 
