@@ -102,6 +102,34 @@ class MailerService{
             throw error;
         }
     }
+
+    sendAnonReplyMail = async (email, alias, recipientUsername, content, appLink) => {
+        const html = await this.#getTemplate("anonReply", {
+            alias,
+            recipientUsername,
+            content,
+            appLink,
+        });
+
+        await this.transporter.sendMail({
+            from: this.#from(),
+            to: email,
+            replyTo: this.fromAddress,
+            subject: `${recipientUsername} replied to your anonymous message on Wispa`,
+            text: [
+                `${recipientUsername} replied to your anonymous message on Wispa.`,
+                ``,
+                `Your alias: ${alias}`,
+                ``,
+                `${recipientUsername} wrote:`,
+                content,
+                ``,
+                `Visit Wispa: ${appLink}`,
+            ].join("\n"),
+            html,
+        });
+        return { success: true, message: "Reply notification sent." };
+    }
 }
 
 module.exports = MailerService

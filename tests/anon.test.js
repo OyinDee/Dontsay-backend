@@ -7,8 +7,8 @@
  *   POST /anon/claim-thread
  */
 const request = require("supertest");
-const { createApp } = require("../app");
-const { signToken, authHeader } = require("./helpers");
+
+const mockSendAnonReplyMail = jest.fn().mockResolvedValue({ success: true });
 
 jest.mock("../Models/User.model");
 jest.mock("../Models/Messages.model");
@@ -18,9 +18,13 @@ jest.mock("../Models/ForgotPasswordCodes.model");
 jest.mock("../Services/Mailer.Services", () =>
   jest.fn().mockImplementation(() => ({
     sendAnonClaimMail: jest.fn().mockResolvedValue({ success: true }),
+    sendAnonReplyMail: mockSendAnonReplyMail,
     sendForgotPasswordMail: jest.fn().mockResolvedValue({ success: true }),
   }))
 );
+
+const { createApp } = require("../app");
+const { signToken, authHeader } = require("./helpers");
 
 const { anonThreadModel } = require("../Models/AnonThread.model");
 const { anonMessageModel } = require("../Models/AnonMessage.model");
@@ -48,6 +52,8 @@ const mockThread = (overrides = {}) => ({
   recipientUsername: RECIPIENT,
   senderIdentity: null,
   senderAlias: "SilentFox#4821",
+  senderBccEmail: null,
+  bccEmail: null,
   status: "pending_sender_account",
   claimed: false,
   save: jest.fn().mockResolvedValue(true),
@@ -193,6 +199,31 @@ describe("POST /anon/reply", () => {
     expect(res.body.stat).toBe(true);
     expect(anonMessageModel.create).toHaveBeenCalledWith(
       expect.objectContaining({ senderRole: "recipient", content: "Got it!" })
+    );
+  });
+
+  it("emails the original sender when an anonymous reply is posted", async () => {
+    const thread = mockThread({
+      senderBccEmail: "sender@example.com",
+      status: "active",
+    });
+    anonThreadModel.findById.mockResolvedValue(thread);
+    anonMessageModel.create.mockResolvedValue(
+      mockAnonMsg({ senderRole: "recipient", content: "Got it!" })
+    );
+
+    const res = await request(app)
+      .post("/anon/reply")
+      .set(authHeader(token))
+      .send({ threadId: THREAD_ID, content: "Got it!" });
+
+    expect(res.status).toBe(200);
+    expect(mockSendAnonReplyMail).toHaveBeenCalledWith(
+      "sender@example.com",
+      "SilentFox#4821",
+      RECIPIENT,
+      "Got it!",
+      expect.stringContaining("wispah.vercel.app")
     );
   });
 

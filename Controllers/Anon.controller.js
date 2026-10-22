@@ -137,6 +137,21 @@ const replyThread = async (req, res) => {
       expiresAt,
     });
 
+    const senderEmail = thread.senderBccEmail || thread.bccEmail;
+    if (senderEmail) {
+      try {
+        await mailerService.sendAnonReplyMail(
+          senderEmail,
+          thread.senderAlias,
+          username,
+          content,
+          FRONTEND_URL
+        );
+      } catch (mailErr) {
+        console.error("Anon reply email failed:", mailErr.message);
+      }
+    }
+
     // Emit to sender's room if they have claimed the thread
     const io = req.app.get("io");
     if (io && thread.senderIdentity) {

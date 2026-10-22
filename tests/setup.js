@@ -21,6 +21,9 @@ jest.mock("../Services/Mailer.Services", () =>
     sendAnonClaimMail: jest
       .fn()
       .mockResolvedValue({ success: true, message: "Claim email sent." }),
+    sendAnonReplyMail: jest
+      .fn()
+      .mockResolvedValue({ success: true, message: "Reply notification sent." }),
   }))
 );
 
