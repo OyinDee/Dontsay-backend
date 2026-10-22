@@ -198,29 +198,50 @@ const sendMessage = async (request, response) => {
     let threadId = undefined;
     if (bccEmail && userExists.allowAnonymousChat) {
       const alias = generateAlias();
-      const claimToken = jwt.sign(
-        { bccEmail, alias },
-        process.env.JWT_SECRET,
-        { expiresIn: "7d" }
-      );
+
+      // Check if the bccEmail belongs to an existing Wispa account
+      const existingSender = await userInfoModel.findOne({ recoveryEmail: bccEmail });
+
+      let claimToken = null;
+      let status = "pending_sender_account";
+      let senderIdentity = null;
+      let claimed = false;
+
+      if (existingSender) {
+        // Auto-link — no claim step needed
+        status = "active";
+        senderIdentity = existingSender.username;
+        claimed = true;
+      } else {
+        // Generate a one-time claim token for the email flow
+        claimToken = jwt.sign(
+          { bccEmail, alias },
+          process.env.JWT_SECRET,
+          { expiresIn: "7d" }
+        );
+      }
 
       const thread = await anonThreadModel.create({
         recipientUsername: username,
         senderAlias: alias,
         senderBccEmail: bccEmail,
         bccEmail,
-        status: "pending_sender_account",
+        status,
         claimToken,
+        senderIdentity,
+        claimed,
       });
 
       threadId = thread._id.toString();
 
-      // Notify via email
-      const claimLink = `https://wispain.vercel.app/claim?token=${claimToken}&threadId=${threadId}`;
-      try {
-        await mailerService.sendAnonClaimMail(bccEmail, alias, username, claimLink);
-      } catch (mailErr) {
-        console.error("Anon claim email failed:", mailErr.message);
+      if (!existingSender) {
+        // Only email users who don't have an account yet
+        const claimLink = `https://wispain.vercel.app/claim?token=${claimToken}&threadId=${threadId}`;
+        try {
+          await mailerService.sendAnonClaimMail(bccEmail, alias, username, claimLink);
+        } catch (mailErr) {
+          console.error("Anon claim email failed:", mailErr.message);
+        }
       }
     }
 
