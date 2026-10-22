@@ -145,6 +145,14 @@ function createApp() {
   app.post("/anon/thread/from-message", authenticate, startThreadFromMessage);
   app.post("/anon/claim-thread", authenticate, claimThread);
 
+  // Claim links belong to the frontend. Redirect there so links from older
+  // emails (which pointed at the API host) still work.
+  app.get("/claim", (req, res) => {
+    const query = req.originalUrl.split("?")[1];
+    const frontend = process.env.FRONTEND_URL || "https://wispah.vercel.app";
+    res.redirect(`${frontend}/claim${query ? `?${query}` : ""}`);
+  });
+
   return { app, server, io };
 }
 

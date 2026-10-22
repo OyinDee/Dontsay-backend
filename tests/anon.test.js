@@ -456,3 +456,15 @@ describe("POST /anon/claim-thread", () => {
     expect(res.status).toBe(404);
   });
 });
+
+// ── GET /claim (redirect to the frontend) ─────────────────────
+describe("GET /claim", () => {
+  it("redirects claim links to the frontend app", async () => {
+    const res = await request(app).get("/claim?token=abc&threadId=t1");
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(
+      "https://wispah.vercel.app/claim?token=abc&threadId=t1"
+    );
+  });
+});

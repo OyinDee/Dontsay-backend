@@ -193,6 +193,8 @@ const sendMessage = async (request, response) => {
         time: saved.time,
         expiresAt: saved.expiresAt || null,
         read: saved.read,
+        threadId: saved.threadId || null,
+        canReply: Boolean(saved.bccEmail),
       };
       io.to(username).emit("new_wispa", shaped);
     }

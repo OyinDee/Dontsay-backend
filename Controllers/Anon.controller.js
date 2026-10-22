@@ -240,8 +240,6 @@ const sendAnonMessage = async (req, res) => {
   }
 };
 
-// ─── POST /anon/claim-thread ──────────────────────────────────────────────────
-
 // ─── POST /anon/thread/from-message ───────────────────────────────────────────
 // The recipient explicitly chooses to reply to an inbox message. Only now is a
 // conversation created, and the original anonymous message becomes its first
@@ -334,6 +332,8 @@ const startThreadFromMessage = async (req, res) => {
     res.status(500).send({ message: err.message, stat: false });
   }
 };
+
+// ─── POST /anon/claim-thread ──────────────────────────────────────────────────
 
 const claimThread = async (req, res) => {
   try {
