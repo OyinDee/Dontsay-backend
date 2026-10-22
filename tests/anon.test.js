@@ -227,6 +227,55 @@ describe("POST /anon/reply", () => {
     );
   });
 
+  it("finds the sender email on the original inbox message when it is missing from the thread", async () => {
+    anonThreadModel.findById.mockResolvedValue(mockThread({ status: "active" }));
+    anonMessageModel.create.mockResolvedValue(
+      mockAnonMsg({ senderRole: "recipient", content: "Got it!" })
+    );
+    messagesModel.findOne.mockResolvedValue({ bccEmail: "sender@example.com" });
+
+    const res = await request(app)
+      .post("/anon/reply")
+      .set(authHeader(token))
+      .send({ threadId: THREAD_ID, content: "Got it!" });
+
+    expect(res.status).toBe(200);
+    expect(messagesModel.findOne).toHaveBeenCalledWith({ threadId: THREAD_ID });
+    expect(mockSendAnonReplyMail).toHaveBeenCalledWith(
+      "sender@example.com",
+      "SilentFox#4821",
+      RECIPIENT,
+      "Got it!",
+      expect.stringContaining("wispah.vercel.app")
+    );
+  });
+
+  it("uses the claimed sender's recovery email if no message email is available", async () => {
+    anonThreadModel.findById.mockResolvedValue(
+      mockThread({ senderIdentity: SENDER, status: "active" })
+    );
+    anonMessageModel.create.mockResolvedValue(
+      mockAnonMsg({ senderRole: "recipient", content: "Got it!" })
+    );
+    messagesModel.findOne.mockResolvedValue(null);
+    userInfoModel.findOne.mockResolvedValue({ recoveryEmail: "account@example.com" });
+
+    const res = await request(app)
+      .post("/anon/reply")
+      .set(authHeader(token))
+      .send({ threadId: THREAD_ID, content: "Got it!" });
+
+    expect(res.status).toBe(200);
+    expect(userInfoModel.findOne).toHaveBeenCalledWith({ username: SENDER });
+    expect(mockSendAnonReplyMail).toHaveBeenCalledWith(
+      "account@example.com",
+      "SilentFox#4821",
+      RECIPIENT,
+      "Got it!",
+      expect.stringContaining("wispah.vercel.app")
+    );
+  });
+
   it("computes expiresAt when expiresIn is provided", async () => {
     anonThreadModel.findById.mockResolvedValue(mockThread({ status: "active" }));
     anonMessageModel.create.mockResolvedValue(mockAnonMsg());
