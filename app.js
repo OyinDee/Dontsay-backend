@@ -43,17 +43,96 @@ const {
 const { userInfoModel } = require("./Models/User.model");
 const { anonThreadModel } = require("./Models/AnonThread.model");
 
+const getAllowedOrigins = () => {
+  const configuredOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",")
+    : [
+        process.env.FRONTEND_URL,
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173",
+        "https://wispah.vercel.app",
+      ];
+
+  return configuredOrigins
+    .filter((entry) => typeof entry === "string")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
+const normalizeOrigin = (origin) => {
+  if (!origin) return "";
+
+  try {
+    return new URL(origin).origin;
+  } catch {
+    return origin.replace(/\/+$/, "");
+  }
+};
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  const normalizedOrigin = normalizeOrigin(origin);
+  const allowedOrigins = getAllowedOrigins().map(normalizeOrigin);
+
+  return allowedOrigins.some(
+    (allowedOrigin) =>
+      allowedOrigin === "*" ||
+      allowedOrigin === normalizedOrigin ||
+      normalizedOrigin.startsWith(`${allowedOrigin}/`)
+  );
+};
+
 function createApp() {
   const app = express();
+  const allowedOrigins = getAllowedOrigins();
 
   app.use(bodyParser.json({ limit: "50mb", extended: true }));
   app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
-  app.use(cors());
+  app.use(
+    cors({
+      origin(origin, callback) {
+        if (!origin || isAllowedOrigin(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(new Error(`Origin ${origin} is not allowed by CORS`));
+      },
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+      ],
+    })
+  );
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   const server = http.createServer(app);
   const io = new Server(server, {
-    cors: { origin: "*", methods: ["GET", "POST"] },
+    cors: {
+      origin(origin, callback) {
+        if (!origin || isAllowedOrigin(origin)) {
+          callback(null, true);
+          return;
+        }
+
+        callback(new Error(`Origin ${origin} is not allowed by Socket.IO CORS`));
+      },
+      methods: ["GET", "POST", "OPTIONS"],
+      credentials: true,
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+      ],
+    },
   });
 
   app.set("io", io);
