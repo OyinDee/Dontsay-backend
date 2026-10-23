@@ -43,7 +43,11 @@ near month end if you add more.
    `npm ci`, start `node index.js`, health check `/health`, Node 22.
 3. Create a Brevo API key and verify the sender address in Brevo, then fill the
    secret env vars in the dashboard: `URI`, `JWT_SECRET`, `BREVO_API_KEY`,
-   `EMAIL_FROM`, `CLOUD_NAME`, `API_KEY`, `API_SECRET`. `EMAIL_FROM` must be the
+   `EMAIL_FROM`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and
+   `CLOUDINARY_API_SECRET` (or set the equivalent `CLOUDINARY_URL`). These
+   Cloudinary values are available in the Cloudinary dashboard; legacy
+   `CLOUD_NAME`, `API_KEY`, and `API_SECRET` names are also accepted.
+   `EMAIL_FROM` must be the
    verified sender address in Brevo. `EMAIL_FROM_NAME` defaults to `Wispa`.
    Email is sent through Brevo's HTTPS API; Render's free plan blocks outbound
    SMTP ports, so Gmail SMTP credentials (`EMAIL` and `PASSWORD`) are no

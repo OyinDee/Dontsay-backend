@@ -9,7 +9,20 @@ const anonMessageSchema = new mongoose.Schema({
     threadId:   { type: mongoose.Schema.Types.ObjectId, ref: "anonthread", required: true },
     fromAlias:  { type: String, required: true },   // alias shown to the other party
     senderRole: { type: String, enum: ["sender", "recipient"], required: true },
-    content:    { type: String, default: "", required: function () { return !this.imageURL && !this.voiceURL; } },
+    content: {
+        type: String,
+        default: "",
+        validate: {
+            validator: function (content) {
+                return Boolean(
+                    (typeof content === "string" && content.trim()) ||
+                    this.imageURL ||
+                    this.voiceURL
+                );
+            },
+            message: "An anonymous message must include text, an image, or a voice note",
+        },
+    },
     title:      { type: String, default: null },
     imageURL:   { type: String, default: null },
     voiceURL:   { type: String, default: null },
