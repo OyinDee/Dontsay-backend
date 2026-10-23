@@ -117,8 +117,33 @@ describe("GET /anon/threads", () => {
     expect(t).toHaveProperty("status");
     expect(t).toHaveProperty("unreadCount");
     expect(t).toHaveProperty("lastMessage");
+    expect(t.isRecipient).toBe(true);
     expect(t.unreadCount).toBe(1);
     expect(t.lastMessage.content).toBe("hey");
+  });
+
+  it("identifies a claimed sender as the sender when listing threads", async () => {
+    anonThreadModel.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([
+        mockThread({ claimed: true, senderIdentity: SENDER, status: "active" }),
+      ]),
+    });
+    anonMessageModel.countDocuments.mockResolvedValue(0);
+    anonMessageModel.findOne.mockReturnValue({
+      sort: jest.fn().mockResolvedValue(null),
+    });
+
+    const res = await request(app)
+      .get("/anon/threads")
+      .set(authHeader(signToken(SENDER)));
+
+    expect(res.status).toBe(200);
+    expect(res.body.threads[0].isRecipient).toBe(false);
+    expect(anonMessageModel.countDocuments).toHaveBeenCalledWith({
+      threadId: THREAD_ID,
+      senderRole: "recipient",
+      read: false,
+    });
   });
 
   it("returns empty array when no threads exist", async () => {

@@ -129,6 +129,7 @@ Response:
         "_id":         "abc123",
         "senderAlias": "Ghost#4821",
         "status":      "active",
+        "isRecipient": true,
         "unreadCount": 2,
         "lastMessage": {
           "content":   "hey",
@@ -139,7 +140,9 @@ Response:
   }
 
 Return threads where the logged-in user is the recipient OR the sender
-(once they've claimed the thread).
+(once they've claimed the thread). `isRecipient` identifies the logged-in
+user's role in each thread so the chat can select the correct message style
+and reply endpoint.
 status is one of: "pending_sender_account" | "active" | "closed"
 
 

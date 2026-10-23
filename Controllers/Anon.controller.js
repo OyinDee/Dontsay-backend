@@ -46,6 +46,7 @@ const getThreads = async (req, res) => {
           _id: t._id,
           senderAlias: t.senderAlias,
           status: t.status,
+          isRecipient,
           unreadCount,
           lastMessage: lastMsg
             ? { content: lastMsg.content, createdAt: lastMsg.createdAt }

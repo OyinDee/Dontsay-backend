@@ -89,7 +89,10 @@ header.
 
 #### `GET /anon/threads`
 
-Returns the user's threads with an `unreadCount` for each thread.
+Returns the user's threads with an `unreadCount` for each thread and an
+`isRecipient` flag indicating whether the authenticated user owns the anonymous
+inbox. Claimed senders receive `isRecipient: false`, which identifies their
+messages and routes their replies through the sender endpoint.
 
 #### `GET /anon/thread/:threadId`
 
