@@ -31,6 +31,7 @@ const { anonThreadModel } = require("../Models/AnonThread.model");
 const { anonMessageModel } = require("../Models/AnonMessage.model");
 const { messagesModel } = require("../Models/Messages.model");
 const { userInfoModel } = require("../Models/User.model");
+const { uploadToCloudinary, uploadAudioToCloudinary } = require("../Utils/Cloudinary.utils");
 
 let app, server;
 
@@ -70,6 +71,7 @@ const mockAnonMsg = (overrides = {}) => ({
   content: "hey",
   title: null,
   imageURL: null,
+  voiceURL: null,
   read: false,
   expiresAt: null,
   createdAt: new Date().toISOString(),
@@ -118,6 +120,7 @@ describe("GET /anon/threads", () => {
     expect(t).toHaveProperty("unreadCount");
     expect(t).toHaveProperty("lastMessage");
     expect(t.isRecipient).toBe(true);
+    expect(t.peerName).toBe("SilentFox#4821");
     expect(t.unreadCount).toBe(1);
     expect(t.lastMessage.content).toBe("hey");
   });
@@ -139,6 +142,7 @@ describe("GET /anon/threads", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.threads[0].isRecipient).toBe(false);
+    expect(res.body.threads[0].peerName).toBe(RECIPIENT);
     expect(anonMessageModel.countDocuments).toHaveBeenCalledWith({
       threadId: THREAD_ID,
       senderRole: "recipient",
@@ -253,6 +257,29 @@ describe("POST /anon/reply", () => {
     expect(res.body.stat).toBe(true);
     expect(anonMessageModel.create).toHaveBeenCalledWith(
       expect.objectContaining({ senderRole: "recipient", content: "Got it!" })
+    );
+  });
+
+  it("recipient can send an image-only message", async () => {
+    anonThreadModel.findById.mockResolvedValue(mockThread({ status: "active" }));
+    anonMessageModel.create.mockResolvedValue(
+      mockAnonMsg({ senderRole: "recipient", content: "", imageURL: "https://image.test/photo.jpg" })
+    );
+
+    const res = await request(app)
+      .post("/anon/reply")
+      .set(authHeader(token))
+      .send({ threadId: THREAD_ID, image: "data:image/png;base64,aW1hZ2U=" });
+
+    expect(res.status).toBe(200);
+    expect(uploadToCloudinary).toHaveBeenCalledWith("data:image/png;base64,aW1hZ2U=");
+    expect(anonMessageModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        senderRole: "recipient",
+        content: "",
+        imageURL: expect.any(String),
+        voiceURL: null,
+      })
     );
   });
 
@@ -374,6 +401,18 @@ describe("POST /anon/reply", () => {
 
     expect(res.status).toBe(404);
   });
+
+  it("rejects a malformed image data URL", async () => {
+    anonThreadModel.findById.mockResolvedValue(mockThread({ status: "active" }));
+
+    const res = await request(app)
+      .post("/anon/reply")
+      .set(authHeader(token))
+      .send({ threadId: THREAD_ID, image: "not-an-image" });
+
+    expect(res.status).toBe(400);
+    expect(uploadToCloudinary).not.toHaveBeenCalled();
+  });
 });
 
 // ── POST /anon/send ───────────────────────────────────────────
@@ -399,6 +438,31 @@ describe("POST /anon/send", () => {
     );
   });
 
+  it("claimed sender can send a voice-note-only message", async () => {
+    anonThreadModel.findById.mockResolvedValue(
+      mockThread({ senderIdentity: SENDER, claimed: true, status: "active" })
+    );
+    anonMessageModel.create.mockResolvedValue(
+      mockAnonMsg({ senderRole: "sender", content: "", voiceURL: "https://audio.test/note.webm" })
+    );
+
+    const res = await request(app)
+      .post("/anon/send")
+      .set(authHeader(token))
+      .send({ threadId: THREAD_ID, voiceNote: "data:audio/webm;base64,YXVkaW8=" });
+
+    expect(res.status).toBe(200);
+    expect(uploadAudioToCloudinary).toHaveBeenCalledWith("data:audio/webm;base64,YXVkaW8=");
+    expect(anonMessageModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        senderRole: "sender",
+        content: "",
+        imageURL: null,
+        voiceURL: expect.any(String),
+      })
+    );
+  });
+
   it("returns 403 when caller is not the claimed sender", async () => {
     anonThreadModel.findById.mockResolvedValue(
       mockThread({ senderIdentity: "realowner", claimed: true, status: "active" })
@@ -421,6 +485,20 @@ describe("POST /anon/send", () => {
       .send({ threadId: "bad", content: "hi" });
 
     expect(res.status).toBe(404);
+  });
+
+  it("rejects an empty message", async () => {
+    anonThreadModel.findById.mockResolvedValue(
+      mockThread({ senderIdentity: SENDER, claimed: true, status: "active" })
+    );
+
+    const res = await request(app)
+      .post("/anon/send")
+      .set(authHeader(token))
+      .send({ threadId: THREAD_ID, content: "  " });
+
+    expect(res.status).toBe(400);
+    expect(anonMessageModel.create).not.toHaveBeenCalled();
   });
 });
 

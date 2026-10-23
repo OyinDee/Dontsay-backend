@@ -92,7 +92,17 @@ header.
 Returns the user's threads with an `unreadCount` for each thread and an
 `isRecipient` flag indicating whether the authenticated user owns the anonymous
 inbox. Claimed senders receive `isRecipient: false`, which identifies their
-messages and routes their replies through the sender endpoint.
+messages and routes their replies through the sender endpoint. `peerName` is
+the anonymous sender alias for inbox owners and the inbox owner's username for
+claimed senders.
+
+#### `POST /anon/reply` and `POST /anon/send`
+
+In addition to text, these endpoints accept optional `image` and `voiceNote`
+base64 data URLs. Images and audio are stored in Cloudinary and returned on each
+message as `imageURL` and `voiceURL`. A message must include text, an image, or
+a voice note. Images are limited to 8 MB and voice notes to 10 MB; the chat
+also stops recordings after two minutes.
 
 #### `GET /anon/thread/:threadId`
 

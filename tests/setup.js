@@ -32,5 +32,8 @@ jest.mock("../Utils/Cloudinary.utils", () => ({
   uploadToCloudinary: jest
     .fn()
     .mockResolvedValue("https://res.cloudinary.com/mock/image/upload/test.jpg"),
+  uploadAudioToCloudinary: jest
+    .fn()
+    .mockResolvedValue("https://res.cloudinary.com/mock/video/upload/test.webm"),
   cloudinary: {},
 }));

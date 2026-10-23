@@ -3,6 +3,7 @@ const { anonThreadModel } = require("../Models/AnonThread.model");
 const { anonMessageModel } = require("../Models/AnonMessage.model");
 const { messagesModel } = require("../Models/Messages.model");
 const { userInfoModel } = require("../Models/User.model");
+const { uploadToCloudinary, uploadAudioToCloudinary } = require("../Utils/Cloudinary.utils");
 const { generateAlias } = require("../Utils/AliasGenerator.utils");
 const MailerService = require("../Services/Mailer.Services");
 require("dotenv").config();
@@ -10,6 +11,12 @@ require("dotenv").config();
 const mailerService = new MailerService();
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://wispah.vercel.app";
+
+const getDataUrlBytes = (value, mediaType) => {
+  if (typeof value !== "string") return null;
+  const match = value.match(new RegExp(`^data:${mediaType}/[\\w.+-]+;base64,([A-Za-z0-9+/]*={0,2})$`));
+  return match ? Buffer.byteLength(match[1], "base64") : null;
+};
 
 // ─── GET /anon/threads ───────────────────────  ─────────────────────────────────
 // Returns all threads where the logged-in user is recipient OR claimed sender.
@@ -45,11 +52,17 @@ const getThreads = async (req, res) => {
         return {
           _id: t._id,
           senderAlias: t.senderAlias,
+          peerName: isRecipient ? t.senderAlias : t.recipientUsername,
           status: t.status,
           isRecipient,
           unreadCount,
           lastMessage: lastMsg
-            ? { content: lastMsg.content, createdAt: lastMsg.createdAt }
+            ? {
+                content: lastMsg.content,
+                imageURL: lastMsg.imageURL || null,
+                voiceURL: lastMsg.voiceURL || null,
+                createdAt: lastMsg.createdAt,
+              }
             : null,
         };
       })
@@ -97,6 +110,7 @@ const getThread = async (req, res) => {
       content: m.content,
       title: m.title || null,
       imageURL: m.imageURL || null,
+      voiceURL: m.voiceURL || null,
       read: m.read,
       expiresAt: m.expiresAt || null,
       createdAt: m.createdAt,
@@ -121,7 +135,7 @@ const getThread = async (req, res) => {
 const replyThread = async (req, res) => {
   try {
     const { username } = req.user;
-    const { threadId, content, title, expiresIn } = req.body;
+    const { threadId, content, title, expiresIn, image, voiceNote } = req.body;
 
     const thread = await anonThreadModel.findById(threadId);
     if (!thread) return res.status(404).send({ message: "Thread not found", stat: false });
@@ -132,18 +146,40 @@ const replyThread = async (req, res) => {
     if (thread.status === "closed") {
       return res.status(400).send({ message: "Thread is closed", stat: false });
     }
+    const text = typeof content === "string" ? content.trim() : "";
+    if (!text && !image && !voiceNote) {
+      return res.status(400).send({ message: "A message, image, or voice note is required", stat: false });
+    }
+    const imageBytes = image ? getDataUrlBytes(image, "image") : null;
+    if (image && imageBytes === null) {
+      return res.status(400).send({ message: "Image must be a base64 image data URL", stat: false });
+    }
+    if (imageBytes === 0 || imageBytes > 8 * 1024 * 1024) {
+      return res.status(413).send({ message: "Images must be 8 MB or smaller", stat: false });
+    }
+    const voiceBytes = voiceNote ? getDataUrlBytes(voiceNote, "audio") : null;
+    if (voiceNote && voiceBytes === null) {
+      return res.status(400).send({ message: "Voice note must be a base64 audio data URL", stat: false });
+    }
+    if (voiceBytes === 0 || voiceBytes > 10 * 1024 * 1024) {
+      return res.status(413).send({ message: "Voice notes must be 10 MB or smaller", stat: false });
+    }
 
     let expiresAt = null;
     if (expiresIn && Number(expiresIn) > 0) {
       expiresAt = new Date(Date.now() + Number(expiresIn) * 1000);
     }
 
+    const imageURL = image ? await uploadToCloudinary(image) : null;
+    const voiceURL = voiceNote ? await uploadAudioToCloudinary(voiceNote) : null;
     const msg = await anonMessageModel.create({
       threadId,
       fromAlias: username, // recipient's username used as alias for themselves
       senderRole: "recipient",
-      content,
+      content: text,
       title: title || null,
+      imageURL,
+      voiceURL,
       expiresAt,
     });
 
@@ -201,7 +237,9 @@ const replyThread = async (req, res) => {
           senderEmail,
           thread.senderAlias,
           username,
-          content,
+          text || (imageURL && voiceURL
+            ? "Sent an image and a voice note."
+            : imageURL ? "Sent an image." : voiceURL ? "Sent a voice note." : text),
           appLink
         );
         console.info("Anon reply email sent", {
@@ -231,6 +269,7 @@ const replyThread = async (req, res) => {
           content: msg.content,
           title: msg.title,
           imageURL: msg.imageURL,
+          voiceURL: msg.voiceURL,
           read: msg.read,
           expiresAt: msg.expiresAt,
           createdAt: msg.createdAt,
@@ -246,6 +285,7 @@ const replyThread = async (req, res) => {
         content: msg.content,
         title: msg.title || null,
         imageURL: msg.imageURL || null,
+        voiceURL: msg.voiceURL || null,
         read: msg.read,
         expiresAt: msg.expiresAt || null,
         createdAt: msg.createdAt,
@@ -261,7 +301,7 @@ const replyThread = async (req, res) => {
 const sendAnonMessage = async (req, res) => {
   try {
     const { username } = req.user;
-    const { threadId, content, title, expiresIn } = req.body;
+    const { threadId, content, title, expiresIn, image, voiceNote } = req.body;
 
     const thread = await anonThreadModel.findById(threadId);
     if (!thread) return res.status(404).send({ message: "Thread not found", stat: false });
@@ -272,18 +312,40 @@ const sendAnonMessage = async (req, res) => {
     if (thread.status === "closed") {
       return res.status(400).send({ message: "Thread is closed", stat: false });
     }
+    const text = typeof content === "string" ? content.trim() : "";
+    if (!text && !image && !voiceNote) {
+      return res.status(400).send({ message: "A message, image, or voice note is required", stat: false });
+    }
+    const imageBytes = image ? getDataUrlBytes(image, "image") : null;
+    if (image && imageBytes === null) {
+      return res.status(400).send({ message: "Image must be a base64 image data URL", stat: false });
+    }
+    if (imageBytes === 0 || imageBytes > 8 * 1024 * 1024) {
+      return res.status(413).send({ message: "Images must be 8 MB or smaller", stat: false });
+    }
+    const voiceBytes = voiceNote ? getDataUrlBytes(voiceNote, "audio") : null;
+    if (voiceNote && voiceBytes === null) {
+      return res.status(400).send({ message: "Voice note must be a base64 audio data URL", stat: false });
+    }
+    if (voiceBytes === 0 || voiceBytes > 10 * 1024 * 1024) {
+      return res.status(413).send({ message: "Voice notes must be 10 MB or smaller", stat: false });
+    }
 
     let expiresAt = null;
     if (expiresIn && Number(expiresIn) > 0) {
       expiresAt = new Date(Date.now() + Number(expiresIn) * 1000);
     }
 
+    const imageURL = image ? await uploadToCloudinary(image) : null;
+    const voiceURL = voiceNote ? await uploadAudioToCloudinary(voiceNote) : null;
     const msg = await anonMessageModel.create({
       threadId,
       fromAlias: thread.senderAlias,
       senderRole: "sender",
-      content,
+      content: text,
       title: title || null,
+      imageURL,
+      voiceURL,
       expiresAt,
     });
 
@@ -298,6 +360,7 @@ const sendAnonMessage = async (req, res) => {
           content: msg.content,
           title: msg.title,
           imageURL: msg.imageURL,
+          voiceURL: msg.voiceURL,
           read: msg.read,
           expiresAt: msg.expiresAt,
           createdAt: msg.createdAt,
@@ -313,6 +376,7 @@ const sendAnonMessage = async (req, res) => {
         content: msg.content,
         title: msg.title || null,
         imageURL: msg.imageURL || null,
+        voiceURL: msg.voiceURL || null,
         read: msg.read,
         expiresAt: msg.expiresAt || null,
         createdAt: msg.createdAt,
@@ -381,6 +445,7 @@ const startThreadFromMessage = async (req, res) => {
       content: message.message,
       title: message.title || null,
       imageURL: message.imageURL || null,
+      voiceURL: message.voiceURL || null,
       expiresAt: message.expiresAt || null,
       createdAt: message.time || message.createdAt,
     });

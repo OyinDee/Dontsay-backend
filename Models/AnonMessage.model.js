@@ -9,9 +9,10 @@ const anonMessageSchema = new mongoose.Schema({
     threadId:   { type: mongoose.Schema.Types.ObjectId, ref: "anonthread", required: true },
     fromAlias:  { type: String, required: true },   // alias shown to the other party
     senderRole: { type: String, enum: ["sender", "recipient"], required: true },
-    content:    { type: String, required: true },
+    content:    { type: String, default: "", required: function () { return !this.imageURL && !this.voiceURL; } },
     title:      { type: String, default: null },
     imageURL:   { type: String, default: null },
+    voiceURL:   { type: String, default: null },
     read:       { type: Boolean, default: false },
     readAt:     { type: Date, default: null },
     expiresAt:  { type: Date, default: null },       // TTL — null means never expires

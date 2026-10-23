@@ -128,6 +128,7 @@ Response:
       {
         "_id":         "abc123",
         "senderAlias": "Ghost#4821",
+        "peerName":    "Ghost#4821",
         "status":      "active",
         "isRecipient": true,
         "unreadCount": 2,
@@ -142,7 +143,8 @@ Response:
 Return threads where the logged-in user is the recipient OR the sender
 (once they've claimed the thread). `isRecipient` identifies the logged-in
 user's role in each thread so the chat can select the correct message style
-and reply endpoint.
+and reply endpoint. `peerName` is the anonymous sender alias for inbox owners
+and the inbox owner's username for claimed senders.
 status is one of: "pending_sender_account" | "active" | "closed"
 
 
@@ -169,6 +171,7 @@ Response:
         "content":    "...",
         "title":      "optional or null",
         "imageURL":   null,
+        "voiceURL":   null,
         "read":       true,
         "expiresAt":  null,
         "createdAt":  "..."
@@ -184,6 +187,8 @@ Body:
   {
     "threadId":  "abc123",
     "content":   "thanks for the message",
+    "image":     "optional base64 image data URL",
+    "voiceNote": "optional base64 audio data URL",
     "title":     "optional",
     "expiresIn": null
   }

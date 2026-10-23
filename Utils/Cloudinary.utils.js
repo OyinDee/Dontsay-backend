@@ -20,4 +20,10 @@ const uploadToCloudinary = async (base64String) => {
     return result.secure_url;
 };
 
-module.exports = { uploadToCloudinary, cloudinary };
+const uploadAudioToCloudinary = async (base64String) => {
+    if (!base64String) return null;
+    const result = await cloudinary.uploader.upload(base64String, { resource_type: "video" });
+    return result.secure_url;
+};
+
+module.exports = { uploadToCloudinary, uploadAudioToCloudinary, cloudinary };
