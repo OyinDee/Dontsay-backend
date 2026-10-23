@@ -11,7 +11,7 @@ const mailerService = new MailerService();
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://wispah.vercel.app";
 
-// ─── GET /anon/threads ────────────────────────────────────────────────────────
+// ─── GET /anon/threads ───────────────────────  ─────────────────────────────────
 // Returns all threads where the logged-in user is recipient OR claimed sender.
 
 const getThreads = async (req, res) => {
@@ -76,6 +76,15 @@ const getThread = async (req, res) => {
     if (!isRecipient && !isSender) {
       return res.status(403).send({ message: "Forbidden", stat: false });
     }
+
+    await anonMessageModel.updateMany(
+      {
+        threadId,
+        senderRole: isRecipient ? "sender" : "recipient",
+        read: false,
+      },
+      { $set: { read: true, readAt: new Date() } }
+    );
 
     const messages = await anonMessageModel
       .find({ threadId })
@@ -411,7 +420,14 @@ const startThreadFromMessage = async (req, res) => {
 const claimThread = async (req, res) => {
   try {
     const { username } = req.user;
-    const { threadId } = req.body;
+    const { threadId, token } = req.body;
+
+    if (!threadId || !token) {
+      return res.status(400).send({
+        message: "Thread ID and claim token are required",
+        stat: false,
+      });
+    }
 
     const thread = await anonThreadModel.findById(threadId);
     if (!thread) return res.status(404).send({ message: "Thread not found", stat: false });
@@ -423,20 +439,53 @@ const claimThread = async (req, res) => {
       });
     }
 
+    let claims;
+    try {
+      claims = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      return res.status(403).send({ message: "Invalid or expired claim token", stat: false });
+    }
+
+    if (claims.threadId !== thread._id.toString()) {
+      return res.status(403).send({ message: "Invalid or expired claim token", stat: false });
+    }
+
     if (thread.claimed) {
-      // Already claimed — just make sure it's this user
-      if (thread.senderIdentity !== username) {
+      if (thread.senderIdentity?.toLowerCase() !== username.toLowerCase()) {
         return res.status(403).send({ message: "Thread already claimed by another user", stat: false });
       }
       return res.status(200).send({ stat: true, message: "Thread claimed" });
     }
 
-    // Link account
-    thread.senderIdentity = username;
-    thread.claimed = true;
-    thread.status = "active";
-    thread.claimToken = null; // invalidate the one-time token
-    await thread.save();
+    if (thread.claimToken !== token) {
+      return res.status(403).send({ message: "Invalid or expired claim token", stat: false });
+    }
+
+    const claimedThread = await anonThreadModel.findOneAndUpdate(
+      {
+        _id: thread._id,
+        claimed: false,
+        claimToken: token,
+        recipientUsername: { $ne: username },
+      },
+      {
+        $set: {
+          senderIdentity: username,
+          claimed: true,
+          status: "active",
+          claimToken: null,
+        },
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!claimedThread) {
+      const currentThread = await anonThreadModel.findById(threadId);
+      if (currentThread?.claimed && currentThread.senderIdentity?.toLowerCase() === username.toLowerCase()) {
+        return res.status(200).send({ stat: true, message: "Thread claimed" });
+      }
+      return res.status(403).send({ message: "Thread has already been claimed", stat: false });
+    }
 
     res.status(200).send({ stat: true, message: "Thread claimed" });
   } catch (err) {

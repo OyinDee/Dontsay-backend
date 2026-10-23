@@ -82,6 +82,38 @@ All endpoints are relative to your deployed server URL (e.g., `https://your-doma
   - `message`: Status message
   - `stat`: Boolean
 
+### Anonymous Threads
+
+These endpoints require the authenticated user's JWT in the `Authorization`
+header.
+
+#### `GET /anon/threads`
+
+Returns the user's threads with an `unreadCount` for each thread.
+
+#### `GET /anon/thread/:threadId`
+
+Returns the thread and its messages. After verifying the caller is a
+participant, the endpoint marks unread messages from the other participant as
+read, so the unread count is cleared when the thread is next fetched.
+
+#### `POST /anon/claim-thread`
+
+Body:
+
+```json
+{
+  "threadId": "abc123",
+  "token": "claim-link-jwt"
+}
+```
+
+The Authorization JWT identifies the account. The claim-link token must be
+valid, unexpired, match the thread ID, and match the thread's stored one-time
+claim token. The token is consumed when the thread is linked to the account.
+The account email does not need to match the notification email.
+Success response: `{ "stat": true, "message": "Thread claimed" }`.
+
 ---
 
 ## Notes

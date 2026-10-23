@@ -47,6 +47,7 @@ beforeEach(() => jest.clearAllMocks());
 const THREAD_ID = "thread001";
 const RECIPIENT = "recip";
 const SENDER = "senduser";
+const CLAIM_TOKEN = jwt.sign({ threadId: THREAD_ID }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
 const mockThread = (overrides = {}) => ({
   _id: THREAD_ID,
@@ -144,6 +145,7 @@ describe("GET /anon/thread/:threadId", () => {
 
   it("returns thread and message list for a participant", async () => {
     anonThreadModel.findById.mockResolvedValue(mockThread());
+    anonMessageModel.updateMany.mockResolvedValue({ modifiedCount: 1 });
     anonMessageModel.find.mockReturnValue({
       sort: jest.fn().mockResolvedValue([mockAnonMsg()]),
     });
@@ -157,6 +159,30 @@ describe("GET /anon/thread/:threadId", () => {
     expect(Array.isArray(res.body.messages)).toBe(true);
     expect(res.body.messages[0]).toHaveProperty("senderRole");
     expect(res.body.messages[0]).toHaveProperty("content");
+    expect(anonMessageModel.updateMany).toHaveBeenCalledWith(
+      { threadId: THREAD_ID, senderRole: "sender", read: false },
+      { $set: { read: true, readAt: expect.any(Date) } }
+    );
+  });
+
+  it("marks recipient replies as read when the claimed sender opens the thread", async () => {
+    anonThreadModel.findById.mockResolvedValue(
+      mockThread({ claimed: true, senderIdentity: SENDER, status: "active" })
+    );
+    anonMessageModel.updateMany.mockResolvedValue({ modifiedCount: 1 });
+    anonMessageModel.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([mockAnonMsg({ senderRole: "recipient" })]),
+    });
+
+    const res = await request(app)
+      .get(`/anon/thread/${THREAD_ID}`)
+      .set(authHeader(signToken(SENDER)));
+
+    expect(res.status).toBe(200);
+    expect(anonMessageModel.updateMany).toHaveBeenCalledWith(
+      { threadId: THREAD_ID, senderRole: "recipient", read: false },
+      { $set: { read: true, readAt: expect.any(Date) } }
+    );
   });
 
   it("returns 403 for a non-participant", async () => {
@@ -168,6 +194,7 @@ describe("GET /anon/thread/:threadId", () => {
       .set(authHeader(outsider));
 
     expect(res.status).toBe(403);
+    expect(anonMessageModel.updateMany).not.toHaveBeenCalled();
   });
 
   it("returns 404 for a non-existent thread", async () => {
@@ -491,31 +518,48 @@ describe("POST /anon/claim-thread", () => {
   const token = signToken(SENDER);
 
   it("claims an unclaimed thread and sets it to active", async () => {
-    const thread = mockThread(); // claimed: false
+    const thread = mockThread({ claimToken: CLAIM_TOKEN }); // claimed: false
     anonThreadModel.findById.mockResolvedValue(thread);
+    anonThreadModel.findOneAndUpdate.mockImplementation(async (_filter, update) => {
+      Object.assign(thread, update.$set);
+      return thread;
+    });
 
     const res = await request(app)
       .post("/anon/claim-thread")
       .set(authHeader(token))
-      .send({ threadId: THREAD_ID });
+      .send({ threadId: THREAD_ID, token: CLAIM_TOKEN });
 
     expect(res.status).toBe(200);
     expect(res.body.stat).toBe(true);
     expect(res.body.message).toMatch(/claimed/i);
-    expect(thread.senderIdentity).toBe(SENDER);
-    expect(thread.claimed).toBe(true);
-    expect(thread.status).toBe("active");
-    expect(thread.save).toHaveBeenCalled();
+    expect(anonThreadModel.findOneAndUpdate).toHaveBeenCalledWith(
+      {
+        _id: THREAD_ID,
+        claimed: false,
+        claimToken: CLAIM_TOKEN,
+        recipientUsername: { $ne: SENDER },
+      },
+      {
+        $set: {
+          senderIdentity: SENDER,
+          claimed: true,
+          status: "active",
+          claimToken: null,
+        },
+      },
+      { new: true, runValidators: true }
+    );
   });
 
   it("prevents the anonymous box owner from claiming their own thread", async () => {
-    const thread = mockThread({ recipientUsername: RECIPIENT.toUpperCase() });
+    const thread = mockThread({ recipientUsername: RECIPIENT.toUpperCase(), claimToken: CLAIM_TOKEN });
     anonThreadModel.findById.mockResolvedValue(thread);
 
     const res = await request(app)
       .post("/anon/claim-thread")
       .set(authHeader(signToken(RECIPIENT)))
-      .send({ threadId: THREAD_ID });
+      .send({ threadId: THREAD_ID, token: CLAIM_TOKEN });
 
     expect(res.status).toBe(403);
     expect(res.body.stat).toBe(false);
@@ -532,10 +576,24 @@ describe("POST /anon/claim-thread", () => {
     const res = await request(app)
       .post("/anon/claim-thread")
       .set(authHeader(token))
-      .send({ threadId: THREAD_ID });
+      .send({ threadId: THREAD_ID, token: CLAIM_TOKEN });
 
     expect(res.status).toBe(200);
     expect(res.body.stat).toBe(true);
+  });
+
+  it("rejects an invalid token even when the thread is already claimed", async () => {
+    anonThreadModel.findById.mockResolvedValue(
+      mockThread({ claimed: true, senderIdentity: SENDER, status: "active" })
+    );
+
+    const res = await request(app)
+      .post("/anon/claim-thread")
+      .set(authHeader(token))
+      .send({ threadId: THREAD_ID, token: "invalid" });
+
+    expect(res.status).toBe(403);
+    expect(res.body.stat).toBe(false);
   });
 
   it("returns 403 when a different user tries to claim an already-claimed thread", async () => {
@@ -546,7 +604,7 @@ describe("POST /anon/claim-thread", () => {
     const res = await request(app)
       .post("/anon/claim-thread")
       .set(authHeader(token)) // SENDER != realowner
-      .send({ threadId: THREAD_ID });
+      .send({ threadId: THREAD_ID, token: CLAIM_TOKEN });
 
     expect(res.status).toBe(403);
   });
@@ -557,9 +615,33 @@ describe("POST /anon/claim-thread", () => {
     const res = await request(app)
       .post("/anon/claim-thread")
       .set(authHeader(token))
-      .send({ threadId: "nope" });
+      .send({ threadId: "nope", token: CLAIM_TOKEN });
 
     expect(res.status).toBe(404);
+  });
+
+  it("rejects a missing claim token", async () => {
+    const res = await request(app)
+      .post("/anon/claim-thread")
+      .set(authHeader(token))
+      .send({ threadId: THREAD_ID });
+
+    expect(res.status).toBe(400);
+    expect(anonThreadModel.findById).not.toHaveBeenCalled();
+  });
+
+  it("rejects a token that does not match the thread", async () => {
+    const thread = mockThread({ claimToken: CLAIM_TOKEN });
+    anonThreadModel.findById.mockResolvedValue(thread);
+    const wrongToken = jwt.sign({ threadId: "different-thread" }, process.env.JWT_SECRET);
+
+    const res = await request(app)
+      .post("/anon/claim-thread")
+      .set(authHeader(token))
+      .send({ threadId: THREAD_ID, token: wrongToken });
+
+    expect(res.status).toBe(403);
+    expect(anonThreadModel.findOneAndUpdate).not.toHaveBeenCalled();
   });
 });
 

@@ -146,6 +146,11 @@ status is one of: "pending_sender_account" | "active" | "closed"
 ### GET /anon/thread/:threadId
 Auth required. Called when the user taps a thread.
 
+After confirming the caller is a participant, mark unread messages sent by the
+other participant as read before returning the history. This makes opening the
+thread clear its unread badge; `GET /anon/threads` then reports the updated
+`unreadCount`.
+
 Response:
   {
     "thread": {
@@ -205,10 +210,13 @@ Response: { "stat": true }
 Auth required. Called when a sender creates an account and wants to link to their thread.
 
 Body:
-  { "threadId": "abc123" }
+  { "threadId": "abc123", "token": "claim-link-jwt" }
 
-The JWT identifies the user. Link their account to the thread.
-Set thread status to "active".
+The Authorization JWT identifies the account. Verify the claim-link JWT
+signature, expiry, embedded thread ID, and equality with the thread's stored
+one-time `claimToken` before linking. Atomically set the sender identity,
+`claimed: true`, `status: "active"`, and clear `claimToken`. Do not require the
+account email to match the notification email.
 Response: { "stat": true, "message": "Thread claimed" }
 
 Reply notification emails for unclaimed threads link to `/claim` with a fresh
