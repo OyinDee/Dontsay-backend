@@ -211,6 +211,11 @@ The JWT identifies the user. Link their account to the thread.
 Set thread status to "active".
 Response: { "stat": true, "message": "Thread claimed" }
 
+Reply notification emails for unclaimed threads link to `/claim` with a fresh
+seven-day claim token and the thread ID. The token identifies the thread and
+does not require the sender to register with the email address that received
+the notification.
+
 
 ### POST /message/mark-read
 Auth required. Called when messages are viewed.

@@ -170,12 +170,29 @@ const replyThread = async (req, res) => {
 
     if (senderEmail) {
       try {
+        let appLink = FRONTEND_URL;
+        if (!thread.claimed) {
+          const claimToken = jwt.sign(
+            { threadId: thread._id.toString() },
+            process.env.JWT_SECRET,
+            { expiresIn: "7d" }
+          );
+          thread.claimToken = claimToken;
+          await thread.save();
+
+          const claimParams = new URLSearchParams({
+            token: claimToken,
+            threadId: thread._id.toString(),
+          });
+          appLink = `${FRONTEND_URL.replace(/\/+$/, "")}/claim?${claimParams}`;
+        }
+
         await mailerService.sendAnonReplyMail(
           senderEmail,
           thread.senderAlias,
           username,
           content,
-          FRONTEND_URL
+          appLink
         );
         console.info("Anon reply email sent", {
           threadId: thread._id.toString(),
@@ -398,6 +415,13 @@ const claimThread = async (req, res) => {
 
     const thread = await anonThreadModel.findById(threadId);
     if (!thread) return res.status(404).send({ message: "Thread not found", stat: false });
+
+    if (thread.recipientUsername.toLowerCase() === username.toLowerCase()) {
+      return res.status(403).send({
+        message: "The anonymous box owner cannot claim this thread",
+        stat: false,
+      });
+    }
 
     if (thread.claimed) {
       // Already claimed — just make sure it's this user

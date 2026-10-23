@@ -7,6 +7,7 @@
  *   POST /anon/claim-thread
  */
 const request = require("supertest");
+const jwt = require("jsonwebtoken");
 
 const mockSendAnonReplyMail = jest.fn().mockResolvedValue({ success: true });
 
@@ -54,6 +55,7 @@ const mockThread = (overrides = {}) => ({
   senderAlias: "SilentFox#4821",
   senderBccEmail: null,
   bccEmail: null,
+  claimToken: null,
   status: "pending_sender_account",
   claimed: false,
   save: jest.fn().mockResolvedValue(true),
@@ -223,8 +225,16 @@ describe("POST /anon/reply", () => {
       "SilentFox#4821",
       RECIPIENT,
       "Got it!",
-      expect.stringContaining("wispah.vercel.app")
+      expect.stringContaining("https://wispah.vercel.app/claim?token=")
     );
+    const claimLink = mockSendAnonReplyMail.mock.calls[0][4];
+    const claimUrl = new URL(claimLink);
+    const claimPayload = jwt.verify(claimUrl.searchParams.get("token"), process.env.JWT_SECRET);
+    expect(claimUrl.searchParams.get("threadId")).toBe(THREAD_ID);
+    expect(claimPayload.threadId).toBe(THREAD_ID);
+    expect(claimPayload.bccEmail).toBeUndefined();
+    expect(thread.claimToken).toBe(claimUrl.searchParams.get("token"));
+    expect(thread.save).toHaveBeenCalled();
   });
 
   it("finds the sender email on the original inbox message when it is missing from the thread", async () => {
@@ -246,7 +256,7 @@ describe("POST /anon/reply", () => {
       "SilentFox#4821",
       RECIPIENT,
       "Got it!",
-      expect.stringContaining("wispah.vercel.app")
+      expect.stringContaining("https://wispah.vercel.app/claim?token=")
     );
   });
 
@@ -496,6 +506,22 @@ describe("POST /anon/claim-thread", () => {
     expect(thread.claimed).toBe(true);
     expect(thread.status).toBe("active");
     expect(thread.save).toHaveBeenCalled();
+  });
+
+  it("prevents the anonymous box owner from claiming their own thread", async () => {
+    const thread = mockThread({ recipientUsername: RECIPIENT.toUpperCase() });
+    anonThreadModel.findById.mockResolvedValue(thread);
+
+    const res = await request(app)
+      .post("/anon/claim-thread")
+      .set(authHeader(signToken(RECIPIENT)))
+      .send({ threadId: THREAD_ID });
+
+    expect(res.status).toBe(403);
+    expect(res.body.stat).toBe(false);
+    expect(thread.senderIdentity).toBeNull();
+    expect(thread.claimed).toBe(false);
+    expect(thread.save).not.toHaveBeenCalled();
   });
 
   it("is idempotent — same user claiming again returns 200", async () => {
