@@ -195,41 +195,26 @@ const replyThread = async (req, res) => {
       expiresAt,
     });
 
-    let senderEmail = thread.senderBccEmail || thread.bccEmail;
-    let emailSource = senderEmail ? "thread" : null;
+    if (!thread.claimed) {
+      let senderEmail = thread.senderBccEmail || thread.bccEmail;
+      let emailSource = senderEmail ? "thread" : null;
 
-    if (!senderEmail) {
-      try {
-        const originalMessage = await messagesModel.findOne({ threadId: thread._id });
-        senderEmail = originalMessage && originalMessage.bccEmail;
-        if (senderEmail) emailSource = "original_message";
-      } catch (lookupErr) {
-        console.error("Anon reply sender email lookup failed", {
-          threadId: thread._id.toString(),
-          source: "original_message",
-          error: lookupErr.message,
-        });
+      if (!senderEmail) {
+        try {
+          const originalMessage = await messagesModel.findOne({ threadId: thread._id });
+          senderEmail = originalMessage && originalMessage.bccEmail;
+          if (senderEmail) emailSource = "original_message";
+        } catch (lookupErr) {
+          console.error("Anon reply sender email lookup failed", {
+            threadId: thread._id.toString(),
+            source: "original_message",
+            error: lookupErr.message,
+          });
+        }
       }
-    }
 
-    if (!senderEmail && thread.senderIdentity) {
-      try {
-        const sender = await userInfoModel.findOne({ username: thread.senderIdentity });
-        senderEmail = sender && sender.recoveryEmail;
-        if (senderEmail) emailSource = "sender_account";
-      } catch (lookupErr) {
-        console.error("Anon reply sender email lookup failed", {
-          threadId: thread._id.toString(),
-          source: "sender_account",
-          error: lookupErr.message,
-        });
-      }
-    }
-
-    if (senderEmail) {
-      try {
-        let appLink = FRONTEND_URL;
-        if (!thread.claimed) {
+      if (senderEmail) {
+        try {
           const claimToken = jwt.sign(
             { threadId: thread._id.toString() },
             process.env.JWT_SECRET,
@@ -242,32 +227,32 @@ const replyThread = async (req, res) => {
             token: claimToken,
             threadId: thread._id.toString(),
           });
-          appLink = `${FRONTEND_URL.replace(/\/+$/, "")}/claim?${claimParams}`;
-        }
+          const appLink = `${FRONTEND_URL.replace(/\/+$/, "")}/claim?${claimParams}`;
 
-        await mailerService.sendAnonReplyMail(
-          senderEmail,
-          thread.senderAlias,
-          username,
-          text || (imageURL && voiceURL
-            ? "Sent an image and a voice note."
-            : imageURL ? "Sent an image." : voiceURL ? "Sent a voice note." : text),
-          appLink
-        );
-        console.info("Anon reply email sent", {
+          await mailerService.sendAnonReplyMail(
+            senderEmail,
+            thread.senderAlias,
+            username,
+            text || (imageURL && voiceURL
+              ? "Sent an image and a voice note."
+              : imageURL ? "Sent an image." : voiceURL ? "Sent a voice note." : text),
+            appLink
+          );
+          console.info("Anon reply email sent", {
+            threadId: thread._id.toString(),
+            source: emailSource,
+          });
+        } catch (mailErr) {
+          console.error("Anon reply email failed", {
+            threadId: thread._id.toString(),
+            error: mailErr.message,
+          });
+        }
+      } else {
+        console.warn("Anon reply email skipped: no sender email on thread", {
           threadId: thread._id.toString(),
-          source: emailSource,
-        });
-      } catch (mailErr) {
-        console.error("Anon reply email failed", {
-          threadId: thread._id.toString(),
-          error: mailErr.message,
         });
       }
-    } else {
-      console.warn("Anon reply email skipped: no sender email on thread", {
-        threadId: thread._id.toString(),
-      });
     }
 
     // Emit to sender's room if they have claimed the thread

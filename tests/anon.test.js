@@ -361,15 +361,17 @@ describe("POST /anon/reply", () => {
     );
   });
 
-  it("uses the claimed sender's recovery email if no message email is available", async () => {
-    anonThreadModel.findById.mockResolvedValue(
-      mockThread({ senderIdentity: SENDER, status: "active" })
-    );
+  it("does not email replies after the sender has claimed the thread", async () => {
+    const thread = mockThread({
+      senderIdentity: SENDER,
+      senderBccEmail: "sender@example.com",
+      claimed: true,
+      status: "active",
+    });
+    anonThreadModel.findById.mockResolvedValue(thread);
     anonMessageModel.create.mockResolvedValue(
       mockAnonMsg({ senderRole: "recipient", content: "Got it!" })
     );
-    messagesModel.findOne.mockResolvedValue(null);
-    userInfoModel.findOne.mockResolvedValue({ recoveryEmail: "account@example.com" });
 
     const res = await request(app)
       .post("/anon/reply")
@@ -377,14 +379,10 @@ describe("POST /anon/reply", () => {
       .send({ threadId: THREAD_ID, content: "Got it!" });
 
     expect(res.status).toBe(200);
-    expect(userInfoModel.findOne).toHaveBeenCalledWith({ username: SENDER });
-    expect(mockSendAnonReplyMail).toHaveBeenCalledWith(
-      "account@example.com",
-      "SilentFox#4821",
-      RECIPIENT,
-      "Got it!",
-      expect.stringContaining("wispah.vercel.app")
-    );
+    expect(messagesModel.findOne).not.toHaveBeenCalled();
+    expect(userInfoModel.findOne).not.toHaveBeenCalled();
+    expect(mockSendAnonReplyMail).not.toHaveBeenCalled();
+    expect(thread.save).not.toHaveBeenCalled();
   });
 
   it("computes expiresAt when expiresIn is provided", async () => {
