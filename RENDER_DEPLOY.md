@@ -7,25 +7,12 @@ The process is stopped, not crashed. The next request pays a cold start (roughly
 30-60 s), and anything in memory is gone: Socket.IO rooms, timers, the Mongoose
 connection.
 
-## Two-layer keep-alive
+## External keep-alive
 
-**Layer 1 - the app pings itself.** Render exposes `RENDER_EXTERNAL_URL` to every
-web service, and `index.js` uses it to call `GET /health` every 10 minutes. That
-request leaves the container, passes through Render's proxy and comes back in,
-so it counts as inbound traffic and resets the idle timer. Set
-`KEEPALIVE_INTERVAL_MS` to change the interval (default 600000).
-
-Two things this cannot do:
-
-- It cannot wake a stopped process. Once Render stops the service, no code is
-  running, so nothing sends the ping. The service stays down until a real
-  request arrives. That is what layer 2 is for.
-- A request to `127.0.0.1` does not count. Render measures traffic at its proxy,
-  so the ping must use the public URL. `RENDER_EXTERNAL_URL` is exactly that.
-
-**Layer 2 - an external monitor as the recovery net.** If the service restarts
-(deploy, crash, OOM) or ever does idle out, an outside request is the only thing
-that brings it back. Set up a free UptimeRobot or cron-job.org monitor:
+The app does not ping itself. Render's free web services stop after 15 minutes
+without inbound traffic, so use an external monitor if you want to keep the API
+awake and bring it back after a restart or spin-down. Set up a free UptimeRobot
+or cron-job.org monitor:
 
 - URL: `https://<your-service>.onrender.com/health`
 - Interval: 5 minutes
@@ -40,7 +27,8 @@ Secrets and variables > Actions > Variables).
 
 Limits: GitHub's scheduler often runs 5-15 minutes late, uncomfortably close to
 Render's 15-minute window, and scheduled workflows stop after 60 days of repo
-inactivity. Keep layer 1 and layer 2 in place; treat this as a third line.
+inactivity. A dedicated external monitor at a 5-minute interval is more
+reliable.
 
 ## Free-tier math
 
@@ -53,8 +41,13 @@ near month end if you add more.
 1. Push the repo (with `render.yaml`) to GitHub.
 2. Render > New > Blueprint, select the repo. `render.yaml` sets build
    `npm ci`, start `node index.js`, health check `/health`, Node 22.
-3. Fill the secret env vars in the dashboard: `URI`, `JWT_SECRET`, `EMAIL`,
-   `PASSWORD`, `CLOUD_NAME`, `API_KEY`, `API_SECRET`.
+3. Create a Brevo API key and verify the sender address in Brevo, then fill the
+   secret env vars in the dashboard: `URI`, `JWT_SECRET`, `BREVO_API_KEY`,
+   `EMAIL_FROM`, `CLOUD_NAME`, `API_KEY`, `API_SECRET`. `EMAIL_FROM` must be the
+   verified sender address in Brevo. `EMAIL_FROM_NAME` defaults to `Wispa`.
+   Email is sent through Brevo's HTTPS API; Render's free plan blocks outbound
+   SMTP ports, so Gmail SMTP credentials (`EMAIL` and `PASSWORD`) are no
+   longer used.
 4. **Fix the Atlas allowlist.** In Atlas > Network Access add `0.0.0.0/0`
    (or the fixed egress IPs on a paid Render plan). Until then every connection
    fails with `MongoServerSelectionError` no matter how many times `index.js`

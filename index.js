@@ -110,38 +110,4 @@ if (!process.env.VERCEL) {
 // every cold start wait for Mongo before the function is ready.
 connectDb();
 
-// Self keep-alive for Render's free tier.
-//
-// Render stops a free service after 15 minutes without inbound traffic. A
-// request to the service's *public* URL passes through Render's proxy, so it
-// counts as traffic and resets that timer. A request to 127.0.0.1 does not.
-//
-// Limitation: this can only keep the process awake once it is running. If the
-// process is stopped (it idled out, crashed, or was replaced by a deploy),
-// nothing is left to send the ping, so it stays down until a real request
-// arrives. Use an external monitor as the recovery net.
-const SELF_URL = process.env.KEEPALIVE_URL || process.env.RENDER_EXTERNAL_URL;
-if (SELF_URL) {
-  const healthUrl = `${SELF_URL.replace(/\/+$/, "")}/health`;
-  const intervalMs = Number(process.env.KEEPALIVE_INTERVAL_MS || 10 * 60 * 1000);
-
-  const ping = async () => {
-    try {
-      const res = await fetch(healthUrl, {
-        signal: AbortSignal.timeout(60_000),
-      });
-      if (!res.ok) console.warn(`keep-alive ping -> HTTP ${res.status}`);
-    } catch (err) {
-      console.warn(`keep-alive ping failed: ${err.message}`);
-    }
-  };
-
-  console.log(
-    `keep-alive enabled: pinging ${healthUrl} every ${Math.round(
-      intervalMs / 1000
-    )}s`
-  );
-  setInterval(ping, intervalMs).unref();
-}
-
 module.exports = { app, server, connectDb };

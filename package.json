@@ -12,7 +12,6 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.8.0",
     "mongoose": "^8.5.2",
-    "nodemailer": "^6.9.14",
     "nodemon": "^3.1.4",
     "socket.io": "4.8.4",
     "swagger-jsdoc": "^6.2.8",
@@ -25,8 +24,12 @@
   },
   "jest": {
     "testEnvironment": "node",
-    "setupFilesAfterEnv": ["./tests/setup.js"],
-    "testMatch": ["**/tests/**/*.test.js"],
+    "setupFilesAfterEnv": [
+      "./tests/setup.js"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
     "testTimeout": 10000,
     "verbose": true
   },
