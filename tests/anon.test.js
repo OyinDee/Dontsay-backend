@@ -605,6 +605,21 @@ describe("POST /anon/thread/from-message", () => {
     expect(anonThreadModel.create).not.toHaveBeenCalled();
   });
 
+  it("does not start a conversation when the sender left no reply email", async () => {
+    messagesModel.findById.mockResolvedValue(mockInboxMessage({ bccEmail: null }));
+
+    const res = await request(app)
+      .post("/anon/thread/from-message")
+      .set(authHeader(token))
+      .send({ messageId: "msg001" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.stat).toBe(false);
+    expect(res.body.message).toMatch(/no reply email/i);
+    expect(anonThreadModel.create).not.toHaveBeenCalled();
+    expect(anonMessageModel.create).not.toHaveBeenCalled();
+  });
+
   it("returns 404 for an unknown message", async () => {
     messagesModel.findById.mockResolvedValue(null);
 

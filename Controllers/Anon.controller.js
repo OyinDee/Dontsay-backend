@@ -417,6 +417,13 @@ const startThreadFromMessage = async (req, res) => {
       }
     }
 
+    if (!message.bccEmail) {
+      return res.status(400).send({
+        message: "This message has no reply email, so a conversation cannot be started",
+        stat: false,
+      });
+    }
+
     const user = await userInfoModel.findOne({ username });
     if (user && user.allowAnonymousChat === false) {
       return res.status(403).send({
