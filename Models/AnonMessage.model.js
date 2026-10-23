@@ -26,6 +26,7 @@ const anonMessageSchema = new mongoose.Schema({
     title:      { type: String, default: null },
     imageURL:   { type: String, default: null },
     voiceURL:   { type: String, default: null },
+    voiceDuration: { type: Number, default: null, min: 0, max: 120 },
     read:       { type: Boolean, default: false },
     readAt:     { type: Date, default: null },
     expiresAt:  { type: Date, default: null },       // TTL — null means never expires

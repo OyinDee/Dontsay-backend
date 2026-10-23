@@ -111,6 +111,7 @@ const getThread = async (req, res) => {
       title: m.title || null,
       imageURL: m.imageURL || null,
       voiceURL: m.voiceURL || null,
+      voiceDuration: m.voiceDuration || null,
       read: m.read,
       expiresAt: m.expiresAt || null,
       createdAt: m.createdAt,
@@ -135,7 +136,7 @@ const getThread = async (req, res) => {
 const replyThread = async (req, res) => {
   try {
     const { username } = req.user;
-    const { threadId, content, title, expiresIn, image, voiceNote } = req.body;
+    const { threadId, content, title, expiresIn, image, voiceNote, voiceDuration: submittedVoiceDuration } = req.body;
 
     const thread = await anonThreadModel.findById(threadId);
     if (!thread) return res.status(404).send({ message: "Thread not found", stat: false });
@@ -164,6 +165,16 @@ const replyThread = async (req, res) => {
     if (voiceBytes === 0 || voiceBytes > 10 * 1024 * 1024) {
       return res.status(413).send({ message: "Voice notes must be 10 MB or smaller", stat: false });
     }
+    const voiceDuration = submittedVoiceDuration === undefined || submittedVoiceDuration === null
+      ? null
+      : Number(submittedVoiceDuration);
+    if (
+      voiceNote &&
+      submittedVoiceDuration !== undefined &&
+      (!Number.isFinite(voiceDuration) || voiceDuration <= 0 || voiceDuration > 120)
+    ) {
+      return res.status(400).send({ message: "Voice note duration must be between 1 and 120 seconds", stat: false });
+    }
 
     let expiresAt = null;
     if (expiresIn && Number(expiresIn) > 0) {
@@ -180,6 +191,7 @@ const replyThread = async (req, res) => {
       title: title || null,
       imageURL,
       voiceURL,
+      voiceDuration,
       expiresAt,
     });
 
@@ -270,6 +282,7 @@ const replyThread = async (req, res) => {
           title: msg.title,
           imageURL: msg.imageURL,
           voiceURL: msg.voiceURL,
+          voiceDuration: msg.voiceDuration ?? voiceDuration,
           read: msg.read,
           expiresAt: msg.expiresAt,
           createdAt: msg.createdAt,
@@ -286,6 +299,7 @@ const replyThread = async (req, res) => {
         title: msg.title || null,
         imageURL: msg.imageURL || null,
         voiceURL: msg.voiceURL || null,
+        voiceDuration: msg.voiceDuration ?? voiceDuration,
         read: msg.read,
         expiresAt: msg.expiresAt || null,
         createdAt: msg.createdAt,
@@ -301,7 +315,7 @@ const replyThread = async (req, res) => {
 const sendAnonMessage = async (req, res) => {
   try {
     const { username } = req.user;
-    const { threadId, content, title, expiresIn, image, voiceNote } = req.body;
+    const { threadId, content, title, expiresIn, image, voiceNote, voiceDuration: submittedVoiceDuration } = req.body;
 
     const thread = await anonThreadModel.findById(threadId);
     if (!thread) return res.status(404).send({ message: "Thread not found", stat: false });
@@ -330,6 +344,16 @@ const sendAnonMessage = async (req, res) => {
     if (voiceBytes === 0 || voiceBytes > 10 * 1024 * 1024) {
       return res.status(413).send({ message: "Voice notes must be 10 MB or smaller", stat: false });
     }
+    const voiceDuration = submittedVoiceDuration === undefined || submittedVoiceDuration === null
+      ? null
+      : Number(submittedVoiceDuration);
+    if (
+      voiceNote &&
+      submittedVoiceDuration !== undefined &&
+      (!Number.isFinite(voiceDuration) || voiceDuration <= 0 || voiceDuration > 120)
+    ) {
+      return res.status(400).send({ message: "Voice note duration must be between 1 and 120 seconds", stat: false });
+    }
 
     let expiresAt = null;
     if (expiresIn && Number(expiresIn) > 0) {
@@ -346,6 +370,7 @@ const sendAnonMessage = async (req, res) => {
       title: title || null,
       imageURL,
       voiceURL,
+      voiceDuration,
       expiresAt,
     });
 
@@ -361,6 +386,7 @@ const sendAnonMessage = async (req, res) => {
           title: msg.title,
           imageURL: msg.imageURL,
           voiceURL: msg.voiceURL,
+          voiceDuration: msg.voiceDuration ?? voiceDuration,
           read: msg.read,
           expiresAt: msg.expiresAt,
           createdAt: msg.createdAt,
@@ -377,6 +403,7 @@ const sendAnonMessage = async (req, res) => {
         title: msg.title || null,
         imageURL: msg.imageURL || null,
         voiceURL: msg.voiceURL || null,
+        voiceDuration: msg.voiceDuration ?? voiceDuration,
         read: msg.read,
         expiresAt: msg.expiresAt || null,
         createdAt: msg.createdAt,
@@ -453,6 +480,7 @@ const startThreadFromMessage = async (req, res) => {
       title: message.title || null,
       imageURL: message.imageURL || null,
       voiceURL: message.voiceURL || null,
+      voiceDuration: message.voiceDuration || null,
       expiresAt: message.expiresAt || null,
       createdAt: message.time || message.createdAt,
     });

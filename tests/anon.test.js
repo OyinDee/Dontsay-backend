@@ -72,6 +72,7 @@ const mockAnonMsg = (overrides = {}) => ({
   title: null,
   imageURL: null,
   voiceURL: null,
+  voiceDuration: null,
   read: false,
   expiresAt: null,
   createdAt: new Date().toISOString(),
@@ -192,6 +193,27 @@ describe("GET /anon/thread/:threadId", () => {
       { threadId: THREAD_ID, senderRole: "sender", read: false },
       { $set: { read: true, readAt: expect.any(Date) } }
     );
+  });
+
+  it("returns the saved voice-note duration with thread messages", async () => {
+    anonThreadModel.findById.mockResolvedValue(mockThread());
+    anonMessageModel.updateMany.mockResolvedValue({ modifiedCount: 1 });
+    anonMessageModel.find.mockReturnValue({
+      sort: jest.fn().mockResolvedValue([
+        mockAnonMsg({
+          content: "",
+          voiceURL: "https://audio.test/note.webm",
+          voiceDuration: 5,
+        }),
+      ]),
+    });
+
+    const res = await request(app)
+      .get(`/anon/thread/${THREAD_ID}`)
+      .set(authHeader(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body.messages[0].voiceDuration).toBe(5);
   });
 
   it("marks recipient replies as read when the claimed sender opens the thread", async () => {
@@ -449,7 +471,11 @@ describe("POST /anon/send", () => {
     const res = await request(app)
       .post("/anon/send")
       .set(authHeader(token))
-      .send({ threadId: THREAD_ID, voiceNote: "data:audio/webm;base64,YXVkaW8=" });
+      .send({
+        threadId: THREAD_ID,
+        voiceNote: "data:audio/webm;base64,YXVkaW8=",
+        voiceDuration: 5,
+      });
 
     expect(res.status).toBe(200);
     expect(uploadAudioToCloudinary).toHaveBeenCalledWith("data:audio/webm;base64,YXVkaW8=");
@@ -459,8 +485,29 @@ describe("POST /anon/send", () => {
         content: "",
         imageURL: null,
         voiceURL: expect.any(String),
+        voiceDuration: 5,
       })
     );
+    expect(res.body.message.voiceDuration).toBe(5);
+  });
+
+  it("rejects invalid voice-note durations", async () => {
+    anonThreadModel.findById.mockResolvedValue(
+      mockThread({ senderIdentity: SENDER, claimed: true, status: "active" })
+    );
+
+    const res = await request(app)
+      .post("/anon/send")
+      .set(authHeader(token))
+      .send({
+        threadId: THREAD_ID,
+        voiceNote: "data:audio/webm;base64,YXVkaW8=",
+        voiceDuration: 0,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/duration/i);
+    expect(uploadAudioToCloudinary).not.toHaveBeenCalled();
   });
 
   it("returns 403 when caller is not the claimed sender", async () => {
