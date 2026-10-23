@@ -11,6 +11,8 @@ require("dotenv").config();
 
 const mailerService = new MailerService();
 
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 // ─── Auth middleware ───────────────────────────────────────────────────────────
 
 const authenticate = (req, res, next) => {
@@ -55,17 +57,25 @@ const login = async (request, response) => {
   const { username, password } = request.body;
 
   try {
-    const user = await userInfoModel.findOne({ username });
-    if (!user) {
+    const users = await userInfoModel.find({
+      username: { $regex: `^${escapeRegex(username)}$`, $options: "i" },
+    });
+    if (users.length === 0) {
       return response.status(200).send({ message: "user not found", stat: false });
     }
 
-    const passwordMatch = await argon2.verify(user.password, password);
-    if (!passwordMatch) {
+    let matchedUser = null;
+    for (const user of users) {
+      if (await argon2.verify(user.password, password)) {
+        matchedUser = user;
+        break;
+      }
+    }
+    if (!matchedUser) {
       return response.status(200).send({ message: "incorrect password", stat: false });
     }
 
-    const token = jwt.sign({ username }, process.env.JWT_SECRET);
+    const token = jwt.sign({ username: matchedUser.username }, process.env.JWT_SECRET);
     response.status(200).send({ message: "logged in", token, stat: true });
   } catch (err) {
     console.log(err.message);

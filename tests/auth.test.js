@@ -3,6 +3,7 @@
  * authenticate middleware
  */
 const request = require("supertest");
+const jwt = require("jsonwebtoken");
 const { createApp } = require("../app");
 const { signToken, authHeader } = require("./helpers");
 
@@ -73,10 +74,10 @@ describe("POST /user/create", () => {
 // ─────────────────────────────────────────────────────────────
 describe("POST /user/login", () => {
   it("logs in with correct credentials", async () => {
-    userInfoModel.findOne.mockResolvedValue({
+    userInfoModel.find.mockResolvedValue([{
       username: "dave",
       password: "hashed_password",
-    });
+    }]);
 
     const res = await request(app)
       .post("/user/login")
@@ -87,14 +88,64 @@ describe("POST /user/login", () => {
     expect(typeof res.body.token).toBe("string");
   });
 
+  it("matches username without case sensitivity and signs in with stored casing", async () => {
+    userInfoModel.find.mockResolvedValue([{
+      username: "Alice",
+      password: "hashed_password",
+    }]);
+
+    const res = await request(app)
+      .post("/user/login")
+      .send({ username: "aLiCe", password: "correctpw" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.stat).toBe(true);
+    expect(userInfoModel.find).toHaveBeenCalledWith({
+      username: { $regex: "^aLiCe$", $options: "i" },
+    });
+    expect(jwt.verify(res.body.token, process.env.JWT_SECRET).username).toBe("Alice");
+  });
+
+  it("treats regex characters in the username literally", async () => {
+    userInfoModel.find.mockResolvedValue([{
+      username: "a.*",
+      password: "hashed_password",
+    }]);
+
+    const res = await request(app)
+      .post("/user/login")
+      .send({ username: "a.*", password: "correctpw" });
+
+    expect(res.body.stat).toBe(true);
+    expect(userInfoModel.find).toHaveBeenCalledWith({
+      username: { $regex: "^a\\.\\*$", $options: "i" },
+    });
+  });
+
+  it("checks passwords when legacy accounts differ only by case", async () => {
+    const argon2 = require("argon2");
+    argon2.verify.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    userInfoModel.find.mockResolvedValue([
+      { username: "alice", password: "first_hash" },
+      { username: "Alice", password: "second_hash" },
+    ]);
+
+    const res = await request(app)
+      .post("/user/login")
+      .send({ username: "ALICE", password: "correctpw" });
+
+    expect(res.body.stat).toBe(true);
+    expect(jwt.verify(res.body.token, process.env.JWT_SECRET).username).toBe("Alice");
+  });
+
   it("rejects wrong password", async () => {
     const argon2 = require("argon2");
     argon2.verify.mockResolvedValueOnce(false); // bad password this call only
 
-    userInfoModel.findOne.mockResolvedValue({
+    userInfoModel.find.mockResolvedValue([{
       username: "dave",
       password: "hashed_password",
-    });
+    }]);
 
     const res = await request(app)
       .post("/user/login")
@@ -105,7 +156,7 @@ describe("POST /user/login", () => {
   });
 
   it("rejects unknown username", async () => {
-    userInfoModel.findOne.mockResolvedValue(null);
+    userInfoModel.find.mockResolvedValue([]);
 
     const res = await request(app)
       .post("/user/login")
